@@ -142,7 +142,7 @@ aetheria/
 | `SUPER + X` | Launch Rofi clipboard history (`cliphist`) |
 | `SUPER + W` | Launch Rofi wallpaper picker (`awww`) |
 | `SUPER + Escape` | Launch Rofi power menu |
-| `SUPER + L` | Lock screen (`hyprlock`) |
+| `SUPER + SHIFT + L` | Lock screen (`hyprlock`) |
 | `SUPER + H / J / K / L` | Vim-style window focus navigation |
 | `SUPER + 1..5` | Switch workspace |
 | `SUPER + SHIFT + 1..5` | Move window to workspace |
