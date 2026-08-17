@@ -1,18 +1,18 @@
 # Minimal Dotfiles
 
-Modular, high-performance Linux desktop environment architecture built for Hyprland, Neovim (NvChad), and an AI-native Zsh terminal workspace. Cyan/void palette contract defined in `palette.md`. Arch Linux optimized.
+Modular, high-performance Linux desktop environment architecture built for Hyprland, Neovim (NvChad), and an AI-native Zsh terminal workspace. Cyan/void palette contract defined in `palette.md`. Multi-distro install support.
 
 ---
 
 ## 🚀 Quick Start & Deployment
 
 ```bash
-git clone https://github.com/your-user/minimal.git ~/minimal
+git clone https://github.com/Hypokoto/minimal.git ~/minimal
 cd ~/minimal
 ./install.sh
 ```
 
-- **`install.sh`**: Idempotent package installer (`pacman` + `yay`) for system binaries, fonts, services, and toolchains.
+- **`install.sh`**: Multi-distro package installer with distro detection (`pacman`/`apt`/`dnf`/`brew`). On Arch Linux (primary target), installs system binaries, fonts, services, and toolchains via `pacman` + `yay` (AUR). On other distros, skips system package installation but still deploys dotfiles via `deploy.sh`.
 - **`deploy.sh`**: Atomic symlinking pipeline for user dotfiles. Performs binary presence verification, palette target compilation, atomic `.bak.$(date +%s)` rotations, parent directory creation precedence (preventing nested target directory bugs), NvChad custom overlaying, and font cache refreshes (`fc-cache -fv`).
 
 ---
@@ -78,7 +78,7 @@ Every binary alias is wrapped in a `command -v <tool> >/dev/null 2>&1` check to 
 
 ```
 minimal/
-├── install.sh                     # Idempotent package installer (pacman + yay)
+├── install.sh                     # Multi-distro package installer (pacman/apt/dnf/brew)
 ├── deploy.sh                      # Idempotent symlinker & NvChad overlay pipeline
 ├── palette.md                     # Color contract single source of truth
 ├── README.md                      # Repository documentation
@@ -144,8 +144,7 @@ minimal/
 | `SUPER + Escape` | Launch Rofi power menu |
 | `SUPER + SHIFT + L` | Lock screen (`hyprlock`) |
 | `SUPER + H / J / K / L` | Vim-style window focus navigation |
-| `SUPER + 1..5` | Switch workspace |
-| `SUPER + SHIFT + 1..5` | Move window to workspace |
+| `SUPER + 1..9` | Switch workspace |
+| `SUPER + SHIFT + 1..9` | Move window to workspace |
 | `Alt + E` / `Ctrl + G` | Trigger Zsh AI Natural Language Helper |
-| `Ctrl + Space` | Trigger ZM Zsh command palette |
 | `XF86Audio*` / `XF86MonBrightness*` | Media controls + zero-latency OSD |
