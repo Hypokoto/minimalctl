@@ -1,4 +1,4 @@
-# Aetheria Dotfiles
+# Minimal Dotfiles
 
 Modular, high-performance Linux desktop environment architecture built for Hyprland, Neovim (NvChad), and an AI-native Zsh terminal workspace. Cyan/void palette contract defined in `palette.md`. Arch Linux optimized.
 
@@ -7,8 +7,8 @@ Modular, high-performance Linux desktop environment architecture built for Hyprl
 ## 🚀 Quick Start & Deployment
 
 ```bash
-git clone https://github.com/your-user/aetheria.git ~/aetheria
-cd ~/aetheria
+git clone https://github.com/your-user/minimal.git ~/minimal
+cd ~/minimal
 ./install.sh
 ```
 
@@ -59,7 +59,7 @@ Every binary alias is wrapped in a `command -v <tool> >/dev/null 2>&1` check to 
 
 ### 3. Agent Safety & Hooks (`zsh/.zshrc`)
 - **Bracketed Paste Protection**: Enables `bracketed-paste-magic` so multi-line code snippets pasted by external AI agents (Aider, Claude Code, OpenCode) drop into the prompt buffer as editable text without auto-executing.
-- **Engine Integrations**: `atuin` (SQLite-backed history search), `zoxide` (frecent directory jump), `starship` (Aetheria prompt engine), `zsh-autosuggestions`, and `zsh-syntax-highlighting`.
+- **Engine Integrations**: `atuin` (SQLite-backed history search), `zoxide` (frecent directory jump), `starship` (Minimal prompt engine), `zsh-autosuggestions`, and `zsh-syntax-highlighting`.
 
 ---
 
@@ -77,7 +77,7 @@ Every binary alias is wrapped in a `command -v <tool> >/dev/null 2>&1` check to 
 ## 📁 Repository Structure
 
 ```
-aetheria/
+minimal/
 ├── install.sh                     # Idempotent package installer (pacman + yay)
 ├── deploy.sh                      # Idempotent symlinker & NvChad overlay pipeline
 ├── palette.md                     # Color contract single source of truth
@@ -106,7 +106,7 @@ aetheria/
 ├── nvim/
 │   ├── ftplugin/java.lua          # Prioritized JDK 21 OpenJDK discovery logic
 │   ├── lua/chadrc.lua             # NvChad entry point
-│   └── lua/themes/aetheria.lua    # Base46 theme matching palette.md
+│   └── lua/themes/minimal.lua    # Base46 theme matching palette.md
 ├── rofi/
 │   ├── theme.rasi                 # Centralized Rofi CSS token theme
 │   └── scripts/
