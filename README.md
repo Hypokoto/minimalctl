@@ -37,9 +37,9 @@ Success:    #4DFF91 | Warning: #FFCC66 | Danger:    #FF5470 | Info:      #61E6FF
 
 ---
 
-## 🛠️ Shell Subsystem & AI Integration (`zsh/`)
+## 🛠️ Shell Subsystem (`zsh/`)
 
-The Zsh shell environment is configured as an AI-native, guarded, high-performance workspace:
+The Zsh shell environment is configured as a guarded, high-performance workspace:
 
 ### 1. Defensive Alias Architecture (`zsh/aliases.zsh`)
 Every binary alias is wrapped in a `command -v <tool> >/dev/null 2>&1` check to guarantee that the shell never breaks if a package is uninstalled or missing:
@@ -50,14 +50,9 @@ Every binary alias is wrapped in a `command -v <tool> >/dev/null 2>&1` check to 
 - **Search**: `grep` → `ripgrep` (`rg`), `find` → `fd`
 - **Safe Deletion**: `rm`, `tp`, `tl`, `tr` → `trash-cli` / `trash-put` (with `rmf` for raw `/bin/rm -iv`)
 - **Safety Overrides**: `cp -iv`, `mv -iv`, `mkdir -pv`
-- **Navigation & Reloader**: `..`, `...`, `....`, `-`, `reload`, `ezsh`, `ealias`, `eai`
+- **Navigation & Reloader**: `..`, `...`, `....`, `-`, `reload`, `ezsh`, `ealias`
 
-### 2. AI Natural Language Bridge (`zsh/ai-helper.zsh`)
-- **Hotkey Trigger**: `Alt+E` (`\ee`) or `Ctrl+G` (`^G`).
-- **Functionality**: Reads plain-English requests from the prompt buffer `$BUFFER` (or interactively) and queries `sgpt` (Shell-GPT) or a local Ollama endpoint (`http://localhost:11434` with `qwen2.5-coder` / `llama3`).
-- **Agent Safety**: The generated shell command is inserted directly into the active `$BUFFER` without auto-executing (`accept-line` is omitted), allowing the user or agent to review and edit before executing.
-
-### 3. Agent Safety & Hooks (`zsh/.zshrc`)
+### 2. Agent Safety & Hooks (`zsh/.zshrc`)
 - **Bracketed Paste Protection**: Enables `bracketed-paste-magic` so multi-line code snippets pasted by external AI agents (Aider, Claude Code, OpenCode) drop into the prompt buffer as editable text without auto-executing.
 - **Engine Integrations**: `atuin` (SQLite-backed history search), `zoxide` (frecent directory jump), `starship` (Minimal prompt engine), `zsh-autosuggestions`, and `zsh-syntax-highlighting`.
 
@@ -105,7 +100,9 @@ minimal/
 │   └── config                     # Notification daemon config & compiled colors
 ├── nvim/
 │   ├── ftplugin/java.lua          # Prioritized JDK 21 OpenJDK discovery logic
+│   ├── lua/autocmds.lua           # Auto-open snacks.dashboard on buffer close
 │   ├── lua/chadrc.lua             # NvChad entry point
+│   ├── lua/mappings.lua           # Guarded close_buffer and nvim-tree toggle
 │   └── lua/themes/minimal.lua    # Base46 theme matching palette.md
 ├── rofi/
 │   ├── theme.rasi                 # Centralized Rofi CSS token theme
@@ -124,8 +121,7 @@ minimal/
 │   └── yazi.toml                  # Yazi file manager configuration
 └── zsh/
     ├── .zshrc                     # Main Zsh configuration
-    ├── aliases.zsh                # Defensive guarded CLI aliases module
-    └── ai-helper.zsh              # Natural language AI prompt bridge
+    └── aliases.zsh                # Defensive guarded CLI aliases module
 ```
 
 ---
@@ -146,5 +142,4 @@ minimal/
 | `SUPER + H / J / K / L` | Vim-style window focus navigation |
 | `SUPER + 1..9` | Switch workspace |
 | `SUPER + SHIFT + 1..9` | Move window to workspace |
-| `Alt + E` / `Ctrl + G` | Trigger Zsh AI Natural Language Helper |
 | `XF86Audio*` / `XF86MonBrightness*` | Media controls + zero-latency OSD |
