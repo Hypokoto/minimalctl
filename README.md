@@ -29,7 +29,6 @@ Success:    #4DFF91 | Warning: #FFCC66 | Danger:    #FF5470 | Info:      #61E6FF
 
 ### Palette Generator (`hypr/colors.lua`)
 `hypr/colors.lua` is a dual-compatible generator (executes identically under standard Lua 5.4 `lua` and LuaJIT 5.1 `luajit`). It parses `palette.md` and deterministically updates:
-- **`hypr/colors.conf`**: Hyprland variable definitions (`$primary = rgba(00D9FFFF)`)
 - **`rofi/theme.rasi`**: Centralized Rofi CSS tokens (`* { primary: #00D9FF; ... }`)
 - **`btop/btop.theme`**: TTY resource monitor color mapping table
 - **`kitty/kitty.conf`**: Terminal palette, borders, and tab bar colors
@@ -84,12 +83,11 @@ minimal/
 ├── git/
 │   └── config                     # Git & delta syntax pager configuration
 ├── hypr/
-│   ├── colors.conf                # Generated Hyprland color variables
 │   ├── colors.lua                 # Palette compiler (Lua 5.1 & 5.4 compatible)
-│   ├── hyprland.conf              # Core Hyprland compositor entry point
+│   ├── hyprland.lua               # Core Hyprland compositor entry point (Lua)
 │   ├── hypridle.conf / hyprlock.conf
-│   ├── keybinds.conf              # Global keybindings & media pipeline
-│   ├── monitors.conf             # Display rules & monitor topology
+│   ├── keybinds.lua               # Global keybindings & media pipeline (Lua)
+│   ├── monitors.lua               # Display rules & monitor topology (Lua)
 │   ├── wallpaper/                 # awww wallpaper picker & daemon scripts
 │   └── scripts/
 │       ├── osd-volume.sh          # Volume OSD widget (-r 91110)
