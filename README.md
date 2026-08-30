@@ -56,7 +56,7 @@ A dedicated suite of modern, high-performance security tooling implemented in Ru
 - **Recon & Fuzzing**: `rustscan` (fast Nmap hand-off) and `feroxbuster` (web content discovery).
 - **Monitoring & Discovery**: `sniffnet` (TUI traffic monitor), `bandwhich`, `trippy` (traceroute), and `netscanner` (ARP LAN discovery).
 - **Analysis**: `hexyl` (hex viewer) and `cargo-audit` (RustSec CVE scanner).
-- *All tools are integrated seamlessly into `zsh/sec.zsh` with fallback aliases and are accessible via the unified Rofi Security Dashboard (`SUPER+S`).*
+- *All tools are accessible via `zsh/sec.zsh` aliases or through the dedicated, debloated Rust `egui` Security Dashboard (`SUPER+S`) featuring zero-dependency syntax highlighting.*
 
 ### 3. Agent Safety & Hooks (`zsh/.zshrc`)
 - **Bracketed Paste Protection**: Enables `bracketed-paste-magic` so multi-line code snippets pasted by external AI agents (Aider, Claude Code, OpenCode) drop into the prompt buffer as editable text without auto-executing.
@@ -72,7 +72,6 @@ A dedicated suite of modern, high-performance security tooling implemented in Ru
 - **Rofi Integration Suite**:
   - `rofi/scripts/clipboard.sh`: Interfaced with `cliphist` + `wl-clipboard` (list, decode, copy, `Alt+Delete` deletion).
   - `rofi/scripts/powermenu.sh`: Interfaced with `hyprctl dispatch exit`, `systemctl suspend`, `reboot`, and `poweroff`.
-  - `rofi/scripts/security.sh`: Unified dashboard showing live network IPs/connections and a launcher for the Rust security toolkit.
   - `rofi/scripts/wallpaper.sh`: Bridge to `hypr/wallpaper/picker.sh` for `awww` hot-reloading.
 
 ---
@@ -117,6 +116,7 @@ minimal/
 │       ├── clipboard.sh           # Cliphist clipboard manager
 │       ├── powermenu.sh           # Hyprland session power menu
 │       └── wallpaper.sh           # Wallpaper dashboard bridge
+├── security-dashboard/            # Native Rust egui app for security tasks
 ├── starship/
 │   └── starship.toml              # Starship prompt configuration
 ├── tmux/
@@ -143,7 +143,7 @@ minimal/
 | `SUPER + F` | Toggle fullscreen |
 | `SUPER + V` | Toggle floating mode |
 | `SUPER + B` | Toggle Waybar and Dynamic Bento Gaps |
-| `SUPER + S` | Launch Rofi security dashboard |
+| `SUPER + S` | Launch native Rust Security Dashboard |
 | `SUPER + X` | Launch Rofi clipboard history (`cliphist`) |
 | `SUPER + W` | Launch Rofi wallpaper picker (`awww`) |
 | `SUPER + Escape` | Launch Rofi power menu |
