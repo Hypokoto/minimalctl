@@ -1,6 +1,6 @@
 # Minimal Dotfiles
 
-Modular, high-performance Linux desktop environment architecture built for Hyprland, Neovim (NvChad), and an AI-native Zsh terminal workspace. Cyan/void palette contract defined in `palette.md`. Multi-distro install support.
+Modular, high-performance Linux desktop environment architecture built for Hyprland, Neovim (NvChad), and an AI-native Zsh terminal workspace. Features a refined, premium Bento Grid UI with a 3-pill Waybar design, conditional gaps, and a dedicated Rust-based security tooling layer. Cyan/void palette contract defined in `palette.md`. Multi-distro install support.
 
 ---
 
@@ -51,7 +51,14 @@ Every binary alias is wrapped in a `command -v <tool> >/dev/null 2>&1` check to 
 - **Safety Overrides**: `cp -iv`, `mv -iv`, `mkdir -pv`
 - **Navigation & Reloader**: `..`, `...`, `....`, `-`, `reload`, `ezsh`, `ealias`
 
-### 2. Agent Safety & Hooks (`zsh/.zshrc`)
+### 2. Rust Security & Networking Layer (`zsh/sec.zsh`)
+A dedicated suite of modern, high-performance security tooling implemented in Rust:
+- **Recon & Fuzzing**: `rustscan` (fast Nmap hand-off) and `feroxbuster` (web content discovery).
+- **Monitoring & Discovery**: `sniffnet` (TUI traffic monitor), `bandwhich`, `trippy` (traceroute), and `netscanner` (ARP LAN discovery).
+- **Analysis**: `hexyl` (hex viewer) and `cargo-audit` (RustSec CVE scanner).
+- *All tools are integrated seamlessly into `zsh/sec.zsh` with fallback aliases and are accessible via the unified Rofi Security Dashboard (`SUPER+S`).*
+
+### 3. Agent Safety & Hooks (`zsh/.zshrc`)
 - **Bracketed Paste Protection**: Enables `bracketed-paste-magic` so multi-line code snippets pasted by external AI agents (Aider, Claude Code, OpenCode) drop into the prompt buffer as editable text without auto-executing.
 - **Engine Integrations**: `atuin` (SQLite-backed history search), `zoxide` (frecent directory jump), `starship` (Minimal prompt engine), `zsh-autosuggestions`, and `zsh-syntax-highlighting`.
 
@@ -59,11 +66,13 @@ Every binary alias is wrapped in a `command -v <tool> >/dev/null 2>&1` check to 
 
 ## 🖥️ Desktop & Rofi Suite
 
-- **Hyprland Engine**: Modern block window rules (`windowrule`), gesture workspace switching, and isolated hardware environment flags (`WLR_DRM_NO_ATOMIC` wrapped in configurable toggles).
+- **Hyprland Engine**: Modern block window rules (`windowrule`), gesture workspace switching, and isolated hardware environment flags. 
+- **Bento UI Toggle**: Pressing `SUPER+B` dynamically toggles the 3-pill Waybar visibility while simultaneously manipulating Hyprland's internal gaps and window rounding settings (via `toggle-bar.sh`), transforming the environment from a gapless focus mode to a padded bento grid dynamically.
 - **OSD Latency Optimization**: `osd-volume.sh` and `osd-brightness.sh` execute through `makoctl` using explicit replaceable notification IDs (`-r 91110` / `-r 91111`) and synchronous hint `-h string:x-canonical-private-synchronous:osd` to eliminate stack delays.
 - **Rofi Integration Suite**:
   - `rofi/scripts/clipboard.sh`: Interfaced with `cliphist` + `wl-clipboard` (list, decode, copy, `Alt+Delete` deletion).
   - `rofi/scripts/powermenu.sh`: Interfaced with `hyprctl dispatch exit`, `systemctl suspend`, `reboot`, and `poweroff`.
+  - `rofi/scripts/security.sh`: Unified dashboard showing live network IPs/connections and a launcher for the Rust security toolkit.
   - `rofi/scripts/wallpaper.sh`: Bridge to `hypr/wallpaper/picker.sh` for `awww` hot-reloading.
 
 ---
@@ -133,6 +142,8 @@ minimal/
 | `SUPER + Q` | Close active window |
 | `SUPER + F` | Toggle fullscreen |
 | `SUPER + V` | Toggle floating mode |
+| `SUPER + B` | Toggle Waybar and Dynamic Bento Gaps |
+| `SUPER + S` | Launch Rofi security dashboard |
 | `SUPER + X` | Launch Rofi clipboard history (`cliphist`) |
 | `SUPER + W` | Launch Rofi wallpaper picker (`awww`) |
 | `SUPER + Escape` | Launch Rofi power menu |
