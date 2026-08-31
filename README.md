@@ -56,6 +56,7 @@ A dedicated suite of modern, high-performance security tooling implemented in Ru
 - **Recon & Fuzzing**: `rustscan` (fast Nmap hand-off) and `feroxbuster` (web content discovery).
 - **Monitoring & Discovery**: `sniffnet` (TUI traffic monitor), `bandwhich`, `trippy` (traceroute), and `netscanner` (ARP LAN discovery).
 - **Analysis**: `hexyl` (hex viewer) and `cargo-audit` (RustSec CVE scanner).
+- **Hardening Pipeline**: `harden` (deploys local sysctl CVE mitigations and updates the kernel).
 - *All tools are accessible via `zsh/sec.zsh` aliases. Network stats and security vitals are visible via the Standalone Conky HUD (`SUPER+S`).*
 
 ### 3. Agent Safety & Hooks (`zsh/.zshrc`)
