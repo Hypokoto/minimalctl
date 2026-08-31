@@ -71,6 +71,7 @@ A dedicated suite of modern, high-performance security tooling implemented in Ru
 - **OSD Latency Optimization**: `osd-volume.sh` and `osd-brightness.sh` execute through `makoctl` using explicit replaceable notification IDs (`-r 91110` / `-r 91111`) and synchronous hint `-h string:x-canonical-private-synchronous:osd` to eliminate stack delays.
 - **Rofi Integration Suite**:
   - `rofi/scripts/clipboard.sh`: Interfaced with `cliphist` + `wl-clipboard` (list, decode, copy, `Alt+Delete` deletion).
+  - `rofi/scripts/display.sh`: Seamless display manager for external monitors (PC Only, Extended, Duplicate, External Only).
   - `rofi/scripts/powermenu.sh`: Interfaced with `hyprctl dispatch exit`, `systemctl suspend`, `reboot`, and `poweroff`.
   - `rofi/scripts/wallpaper.sh`: Bridge to `hypr/wallpaper/picker.sh` for `awww` hot-reloading.
 
@@ -114,6 +115,7 @@ minimal/
 │   ├── theme.rasi                 # Centralized Rofi CSS token theme
 │   └── scripts/
 │       ├── clipboard.sh           # Cliphist clipboard manager
+│       ├── display.sh             # Rofi display manager
 │       ├── powermenu.sh           # Hyprland session power menu
 │       └── wallpaper.sh           # Wallpaper dashboard bridge
 ├── starship/
@@ -145,6 +147,7 @@ minimal/
 | `SUPER + S` | Launch native Rust Security Dashboard |
 | `SUPER + X` | Launch Rofi clipboard history (`cliphist`) |
 | `SUPER + W` | Launch Rofi wallpaper picker (`awww`) |
+| `SUPER + D` | Launch Rofi Display Manager |
 | `SUPER + Escape` | Launch Rofi power menu |
 | `SUPER + SHIFT + L` | Lock screen (`hyprlock`) |
 | `SUPER + H / J / K / L` | Vim-style window focus navigation |
