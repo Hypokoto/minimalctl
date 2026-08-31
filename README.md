@@ -56,7 +56,7 @@ A dedicated suite of modern, high-performance security tooling implemented in Ru
 - **Recon & Fuzzing**: `rustscan` (fast Nmap hand-off) and `feroxbuster` (web content discovery).
 - **Monitoring & Discovery**: `sniffnet` (TUI traffic monitor), `bandwhich`, `trippy` (traceroute), and `netscanner` (ARP LAN discovery).
 - **Analysis**: `hexyl` (hex viewer) and `cargo-audit` (RustSec CVE scanner).
-- *All tools are accessible via `zsh/sec.zsh` aliases or through the dedicated, debloated Rust `egui` Security Dashboard (`SUPER+S`) featuring zero-dependency syntax highlighting.*
+- *All tools are accessible via `zsh/sec.zsh` aliases. Network stats and security vitals are visible via the Standalone Conky HUD (`SUPER+S`).*
 
 ### 3. Agent Safety & Hooks (`zsh/.zshrc`)
 - **Bracketed Paste Protection**: Enables `bracketed-paste-magic` so multi-line code snippets pasted by external AI agents (Aider, Claude Code, OpenCode) drop into the prompt buffer as editable text without auto-executing.
@@ -144,7 +144,7 @@ minimal/
 | `SUPER + F` | Toggle fullscreen |
 | `SUPER + V` | Toggle floating mode |
 | `SUPER + B` | Toggle Waybar and Dynamic Bento Gaps |
-| `SUPER + S` | Launch native Rust Security Dashboard |
+| `SUPER + S` | Toggle Standalone Conky HUD |
 | `SUPER + X` | Launch Rofi clipboard history (`cliphist`) |
 | `SUPER + W` | Launch Rofi wallpaper picker (`awww`) |
 | `SUPER + D` | Launch Rofi Display Manager |
