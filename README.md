@@ -116,7 +116,6 @@ minimal/
 │       ├── clipboard.sh           # Cliphist clipboard manager
 │       ├── powermenu.sh           # Hyprland session power menu
 │       └── wallpaper.sh           # Wallpaper dashboard bridge
-├── security-dashboard/            # Native Rust egui app for security tasks
 ├── starship/
 │   └── starship.toml              # Starship prompt configuration
 ├── tmux/
