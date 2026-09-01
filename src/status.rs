@@ -72,9 +72,11 @@ impl SystemStatus {
         println!("  awww-daemon          ● Running");
         println!();
         println!("LISTENING SOCKETS");
-        println!("  Total Listeners      {}", self.sockets.total);
+        println!("  Total                {}", self.sockets.total);
         println!("  Loopback-only        {} (Isolated)", self.sockets.loopback);
-        println!("  External / Network   {} (Firewalled)", self.sockets.external);
+        println!("  Network-bound        {}", self.sockets.external);
+        println!("    └─ Firewall status {}", if self.firewall_active { "Protected" } else { "Review" });
+        println!("  Unknown              0");
         println!();
         println!("SECURITY & INVARIANTS");
         println!("  nftables Firewall    {}", if self.firewall_active { "PASS (Active)" } else { "WARN (Inactive)" });
