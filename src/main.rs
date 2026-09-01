@@ -6,7 +6,50 @@ use clap::{Parser, Subcommand};
 use doctor::DoctorReport;
 use status::SystemStatus;
 use std::fs;
+use std::path::{Path, PathBuf};
 use theme::Theme;
+
+fn find_repo_root() -> PathBuf {
+    let mut curr = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    loop {
+        if curr.join("waybar").exists() && curr.join("rofi").exists() {
+            return curr;
+        }
+        if !curr.pop() {
+            break;
+        }
+    }
+    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+}
+
+fn resolve_theme_path<P: AsRef<Path>>(input: P, root: &Path) -> PathBuf {
+    let input_path = input.as_ref();
+
+    if input_path.exists() {
+        return input_path.to_path_buf();
+    }
+
+    let rel_root = root.join(input_path);
+    if rel_root.exists() {
+        return rel_root;
+    }
+
+    let in_themes = root.join("themes").join(input_path);
+    if in_themes.exists() {
+        return in_themes;
+    }
+
+    let clean_stem = input_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("");
+    let with_toml = root.join("themes").join(format!("{}.toml", clean_stem));
+    if with_toml.exists() {
+        return with_toml;
+    }
+
+    input_path.to_path_buf()
+}
 
 #[derive(Parser)]
 #[command(name = "minimalctl")]
@@ -49,6 +92,7 @@ enum ThemeActions {
 
 fn main() {
     let cli = Cli::parse();
+    let root = find_repo_root();
 
     match cli.command {
         Commands::Status => {
@@ -63,11 +107,12 @@ fn main() {
         }
         Commands::Theme { action } => match action {
             ThemeActions::Build { path } => {
-                println!("[minimalctl] Loading theme definition from: {}", path);
-                match Theme::load_from_file(&path) {
+                let resolved = resolve_theme_path(&path, &root);
+                println!("[minimalctl] Loading theme definition from: {}", resolved.display());
+                match Theme::load_from_file(&resolved) {
                     Ok(theme) => {
                         println!("[minimalctl] Theme '{}' validated successfully.", theme.meta.name);
-                        match theme.build_all(".") {
+                        match theme.build_all(&root) {
                             Ok(_) => println!("[minimalctl] All target configurations compiled cleanly."),
                             Err(e) => eprintln!("[minimalctl] Build error: {}", e),
                         }
@@ -76,10 +121,11 @@ fn main() {
                 }
             }
             ThemeActions::Apply { path } => {
-                println!("[minimalctl] Applying theme transaction from: {}", path);
-                match Theme::load_from_file(&path) {
+                let resolved = resolve_theme_path(&path, &root);
+                println!("[minimalctl] Applying theme transaction from: {}", resolved.display());
+                match Theme::load_from_file(&resolved) {
                     Ok(theme) => {
-                        if let Err(e) = theme.apply_runtime(".") {
+                        if let Err(e) = theme.apply_runtime(&root) {
                             eprintln!("[!] Transaction aborted: {}", e);
                             std::process::exit(1);
                         }
@@ -92,12 +138,13 @@ fn main() {
             }
             ThemeActions::List => {
                 println!("=== AVAILABLE THEMES ===");
-                if let Ok(entries) = fs::read_dir("themes") {
+                let themes_dir = root.join("themes");
+                if let Ok(entries) = fs::read_dir(&themes_dir) {
                     for entry in entries.flatten() {
                         let path = entry.path();
                         if path.extension().and_then(|s| s.to_str()) == Some("toml") {
                             if let Ok(theme) = Theme::load_from_file(&path) {
-                                println!(" - {} ({}): {}", theme.meta.name, path.display(), theme.meta.description);
+                                println!(" - {:<12} ({}): {}", theme.meta.name, path.file_name().unwrap().to_string_lossy(), theme.meta.description);
                             }
                         }
                     }
@@ -106,11 +153,12 @@ fn main() {
             ThemeActions::Verify => {
                 println!("[minimalctl] Verifying theme definition and target drift...");
                 let mut drift = false;
-                match Theme::load_from_file("themes/obsidian.toml") {
+                let active_theme_path = root.join("themes/obsidian.toml");
+                match Theme::load_from_file(&active_theme_path) {
                     Ok(theme) => {
                         println!(" - themes/obsidian.toml: Valid TOML, all hex tokens verified.");
 
-                        if let Ok(content) = fs::read_to_string("mako/config") {
+                        if let Ok(content) = fs::read_to_string(root.join("mako/config")) {
                             if content.contains("padding=14 16") {
                                 eprintln!("[!] ERROR: mako/config contains invalid space-separated padding!");
                                 drift = true;
@@ -122,7 +170,7 @@ fn main() {
                             }
                         }
 
-                        if let Ok(content) = fs::read_to_string("rofi/theme.rasi") {
+                        if let Ok(content) = fs::read_to_string(root.join("rofi/theme.rasi")) {
                             if content != theme.generate_rofi_theme() {
                                 eprintln!("[!] DRIFT: rofi/theme.rasi differs from compiled obsidian.toml output!");
                                 drift = true;
@@ -131,7 +179,7 @@ fn main() {
                             }
                         }
 
-                        if let Ok(content) = fs::read_to_string("kitty/kitty.conf") {
+                        if let Ok(content) = fs::read_to_string(root.join("kitty/kitty.conf")) {
                             if content != theme.generate_kitty_conf() {
                                 eprintln!("[!] DRIFT: kitty/kitty.conf differs from compiled obsidian.toml output!");
                                 drift = true;
@@ -140,7 +188,7 @@ fn main() {
                             }
                         }
 
-                        if let Ok(content) = fs::read_to_string("waybar/style.css") {
+                        if let Ok(content) = fs::read_to_string(root.join("waybar/style.css")) {
                             if content != theme.generate_waybar_style() {
                                 eprintln!("[!] DRIFT: waybar/style.css differs from compiled obsidian.toml output!");
                                 drift = true;
