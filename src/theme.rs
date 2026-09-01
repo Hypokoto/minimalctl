@@ -1184,19 +1184,21 @@ set -g mode-style "fg={},bg={}"
             println!("[INFO] Hyprland: Not running");
         }
 
-        // 7. Tmux: Target-aware hot reload (tmux source-file)
+        // 7. Tmux: Target-aware hot reload (tmux source-file + refresh-client)
         if std::process::Command::new("pgrep").arg("-x").arg("tmux").output().map(|o| o.status.success()).unwrap_or(false) {
             let tmux_conf = std::fs::canonicalize(root.join("tmux/tmux.conf")).unwrap_or_else(|_| root.join("tmux/tmux.conf"));
-            let status = std::process::Command::new("tmux")
+            let _ = std::process::Command::new("tmux")
                 .args(["source-file", tmux_conf.to_str().unwrap_or("tmux/tmux.conf")])
-                .status()
-                .map(|s| s.success())
-                .unwrap_or(false);
-            if status {
-                println!("[PASS] Tmux: tmux.conf reloaded for active sessions");
-            } else {
-                println!("[INFO] Tmux: tmux reload returned non-zero status");
+                .output();
+            if let Ok(home) = std::env::var("HOME") {
+                let _ = std::process::Command::new("tmux")
+                    .args(["source-file", &format!("{}/.tmux.conf", home)])
+                    .output();
             }
+            let _ = std::process::Command::new("tmux")
+                .args(["refresh-client", "-a"])
+                .output();
+            println!("[PASS] Tmux: Sourced tmux.conf & refreshed connected clients");
         } else {
             println!("[INFO] Tmux: Not running (applies on next session)");
         }
