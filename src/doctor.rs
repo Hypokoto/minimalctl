@@ -126,6 +126,11 @@ impl DoctorReport {
                     drift = true;
                 }
             }
+            if let Ok(content) = fs::read_to_string("tmux/tmux.conf") {
+                if content != theme.generate_tmux_conf() {
+                    drift = true;
+                }
+            }
             if Path::new("nvim/lua/themes/minimal.lua").exists() {
                 if let Ok(content) = fs::read_to_string("nvim/lua/themes/minimal.lua") {
                     if content != theme.generate_nvim_theme() {

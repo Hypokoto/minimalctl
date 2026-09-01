@@ -224,6 +224,15 @@ fn main() {
                             }
                         }
 
+                        if let Ok(content) = fs::read_to_string(root.join("tmux/tmux.conf")) {
+                            if content != theme.generate_tmux_conf() {
+                                eprintln!("[!] DRIFT: tmux/tmux.conf differs from compiled obsidian.toml output!");
+                                drift = true;
+                            } else {
+                                println!(" - tmux/tmux.conf: In sync with source.");
+                            }
+                        }
+
                         let nvim_theme_file = root.join("nvim/lua/themes/minimal.lua");
                         if nvim_theme_file.exists() {
                             if let Ok(content) = fs::read_to_string(&nvim_theme_file) {
