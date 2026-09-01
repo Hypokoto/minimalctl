@@ -196,6 +196,15 @@ fn main() {
                                 println!(" - waybar/style.css: In sync with source.");
                             }
                         }
+
+                        if let Ok(content) = fs::read_to_string(root.join("starship/starship.toml")) {
+                            if content != theme.generate_starship_toml() {
+                                eprintln!("[!] DRIFT: starship/starship.toml differs from compiled obsidian.toml output!");
+                                drift = true;
+                            } else {
+                                println!(" - starship/starship.toml: In sync with source.");
+                            }
+                        }
                     }
                     Err(e) => {
                         eprintln!("[!] ERROR: Failed to parse themes/obsidian.toml: {}", e);

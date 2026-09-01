@@ -111,6 +111,11 @@ impl DoctorReport {
                     drift = true;
                 }
             }
+            if let Ok(content) = fs::read_to_string("starship/starship.toml") {
+                if content != theme.generate_starship_toml() {
+                    drift = true;
+                }
+            }
         }
 
         if !drift {
