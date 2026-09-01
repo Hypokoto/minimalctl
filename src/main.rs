@@ -1,10 +1,11 @@
+mod doctor;
 mod status;
 mod theme;
 
 use clap::{Parser, Subcommand};
+use doctor::DoctorReport;
 use status::SystemStatus;
 use std::fs;
-use std::path::Path;
 use theme::Theme;
 
 #[derive(Parser)]
@@ -17,9 +18,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Print authoritative desktop status and security invariant report
+    /// Print authoritative desktop status and socket inventory
     Status,
-    /// Theme management and target configuration compilation
+    /// Run single-pass operational diagnostic suite across desktop invariants
+    Doctor,
+    /// Theme management, target configuration compilation, and drift verification
     Theme {
         #[command(subcommand)]
         action: ThemeActions,
@@ -35,8 +38,8 @@ enum ThemeActions {
     },
     /// List available themes in themes/
     List,
-    /// Audit existing target configurations against design invariants
-    Check,
+    /// Verify theme definition validity and check target configs for theme drift
+    Verify,
 }
 
 fn main() {
@@ -46,6 +49,12 @@ fn main() {
         Commands::Status => {
             let status = SystemStatus::collect();
             status.print_report();
+        }
+        Commands::Doctor => {
+            let report = DoctorReport::run();
+            if report.fail_count > 0 {
+                std::process::exit(1);
+            }
         }
         Commands::Theme { action } => match action {
             ThemeActions::Build { path } => {
@@ -74,19 +83,55 @@ fn main() {
                     }
                 }
             }
-            ThemeActions::Check => {
-                println!("[minimalctl] Checking generated target configurations...");
-                let mako_path = Path::new("mako/config");
-                if mako_path.exists() {
-                    if let Ok(content) = fs::read_to_string(mako_path) {
-                        if content.contains("padding=14 16") {
-                            eprintln!("[!] ERROR: mako/config contains invalid space-separated padding!");
-                        } else {
-                            println!(" - mako/config: Syntax valid.");
+            ThemeActions::Verify => {
+                println!("[minimalctl] Verifying theme definition and target drift...");
+                let mut drift = false;
+                match Theme::load_from_file("themes/obsidian.toml") {
+                    Ok(theme) => {
+                        println!(" - themes/obsidian.toml: Valid TOML, all hex tokens verified.");
+
+                        if let Ok(content) = fs::read_to_string("mako/config") {
+                            if content.contains("padding=14 16") {
+                                eprintln!("[!] ERROR: mako/config contains invalid space-separated padding!");
+                                drift = true;
+                            } else if content != theme.generate_mako_config() {
+                                eprintln!("[!] DRIFT: mako/config differs from compiled obsidian.toml output!");
+                                drift = true;
+                            } else {
+                                println!(" - mako/config: In sync with source.");
+                            }
+                        }
+
+                        if let Ok(content) = fs::read_to_string("rofi/theme.rasi") {
+                            if content != theme.generate_rofi_theme() {
+                                eprintln!("[!] DRIFT: rofi/theme.rasi differs from compiled obsidian.toml output!");
+                                drift = true;
+                            } else {
+                                println!(" - rofi/theme.rasi: In sync with source.");
+                            }
+                        }
+
+                        if let Ok(content) = fs::read_to_string("kitty/kitty.conf") {
+                            if content != theme.generate_kitty_conf() {
+                                eprintln!("[!] DRIFT: kitty/kitty.conf differs from compiled obsidian.toml output!");
+                                drift = true;
+                            } else {
+                                println!(" - kitty/kitty.conf: In sync with source.");
+                            }
                         }
                     }
+                    Err(e) => {
+                        eprintln!("[!] ERROR: Failed to parse themes/obsidian.toml: {}", e);
+                        drift = true;
+                    }
                 }
-                println!("[minimalctl] All configuration target checks passed.");
+
+                if drift {
+                    eprintln!("[!] Theme verification FAILED: Drift or syntax error detected.");
+                    std::process::exit(1);
+                } else {
+                    println!("[minimalctl] Theme verification PASSED: Zero drift across all targets.");
+                }
             }
         },
     }
