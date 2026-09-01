@@ -1,0 +1,11 @@
+[package]
+name = "minimalctl"
+version = "0.1.0"
+edition = "2021"
+authors = ["Hypokoto <hypokoto@minimal>"]
+description = "Native control plane and theme compiler for Minimal OS Shell"
+
+[dependencies]
+clap = { version = "4.4", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
