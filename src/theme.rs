@@ -1186,7 +1186,7 @@ set -g mode-style "fg={},bg={}"
 
         // 7. Tmux: Target-aware hot reload (tmux source-file)
         if std::process::Command::new("pgrep").arg("-x").arg("tmux").output().map(|o| o.status.success()).unwrap_or(false) {
-            let tmux_conf = root.join("tmux/tmux.conf");
+            let tmux_conf = std::fs::canonicalize(root.join("tmux/tmux.conf")).unwrap_or_else(|_| root.join("tmux/tmux.conf"));
             let status = std::process::Command::new("tmux")
                 .args(["source-file", tmux_conf.to_str().unwrap_or("tmux/tmux.conf")])
                 .status()
