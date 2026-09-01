@@ -1185,7 +1185,13 @@ set -g mode-style "fg={},bg={}"
         }
 
         // 7. Tmux: Target-aware hot reload (tmux source-file + refresh-client)
-        if std::process::Command::new("pgrep").arg("-x").arg("tmux").output().map(|o| o.status.success()).unwrap_or(false) {
+        let tmux_active = std::process::Command::new("tmux")
+            .arg("ls")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+
+        if tmux_active {
             let tmux_conf = std::fs::canonicalize(root.join("tmux/tmux.conf")).unwrap_or_else(|_| root.join("tmux/tmux.conf"));
             let _ = std::process::Command::new("tmux")
                 .args(["source-file", tmux_conf.to_str().unwrap_or("tmux/tmux.conf")])
@@ -1196,11 +1202,14 @@ set -g mode-style "fg={},bg={}"
                     .output();
             }
             let _ = std::process::Command::new("tmux")
+                .args(["refresh-client", "-S"])
+                .output();
+            let _ = std::process::Command::new("tmux")
                 .args(["refresh-client", "-a"])
                 .output();
-            println!("[PASS] Tmux: Sourced tmux.conf & refreshed connected clients");
+            println!("[PASS] Tmux: Sourced tmux.conf & refreshed active sessions live");
         } else {
-            println!("[INFO] Tmux: Not running (applies on next session)");
+            println!("[INFO] Tmux: Server not running (applies on next session)");
         }
 
         println!("[PASS] Theme transaction completed successfully.");
