@@ -40,6 +40,11 @@ enum ThemeActions {
     List,
     /// Verify theme definition validity and check target configs for theme drift
     Verify,
+    /// Compile target configurations and perform target-aware hot reloads
+    Apply {
+        #[arg(default_value = "themes/obsidian.toml")]
+        path: String,
+    },
 }
 
 fn main() {
@@ -68,6 +73,21 @@ fn main() {
                         }
                     }
                     Err(e) => eprintln!("[minimalctl] Theme validation error: {}", e),
+                }
+            }
+            ThemeActions::Apply { path } => {
+                println!("[minimalctl] Applying theme transaction from: {}", path);
+                match Theme::load_from_file(&path) {
+                    Ok(theme) => {
+                        if let Err(e) = theme.apply_runtime(".") {
+                            eprintln!("[!] Transaction aborted: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[!] Theme validation error (Transaction aborted): {}", e);
+                        std::process::exit(1);
+                    }
                 }
             }
             ThemeActions::List => {
