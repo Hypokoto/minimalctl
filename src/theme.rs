@@ -731,18 +731,17 @@ error_symbol = "[λ](bold {})"
         self.build_all(root_dir)?;
         println!("[PASS] Theme source validated & targets built.");
 
-        // 2. Waybar: Target-aware hot reload (SIGUSR2)
-        if std::process::Command::new("pgrep").arg("-x").arg("waybar").output().map(|o| o.status.success()).unwrap_or(false) {
-            let status = std::process::Command::new("pkill")
-                .args(["-SIGUSR2", "waybar"])
-                .status()
-                .map(|s| s.success())
-                .unwrap_or(false);
-            if status {
-                println!("[PASS] Waybar: SIGUSR2 signal sent (Hot reloaded)");
+        // 2. Waybar: Target-aware reload (restarts Waybar process to load compiled GTK style.css)
+        let waybar_was_running = std::process::Command::new("pgrep").arg("-x").arg("waybar").output().map(|o| o.status.success()).unwrap_or(false);
+        if waybar_was_running {
+            let _ = std::process::Command::new("pkill").args(["-x", "waybar"]).output();
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            if std::process::Command::new("pgrep").arg("-x").arg("Hyprland").output().map(|o| o.status.success()).unwrap_or(false) {
+                let _ = std::process::Command::new("hyprctl").args(["dispatch", "exec", "waybar"]).output();
             } else {
-                println!("[WARN] Waybar: pkill SIGUSR2 returned non-zero status");
+                let _ = std::process::Command::new("waybar").spawn();
             }
+            println!("[PASS] Waybar: Restarted with new style.css");
         } else {
             println!("[INFO] Waybar: Not running (applies on launch)");
         }
