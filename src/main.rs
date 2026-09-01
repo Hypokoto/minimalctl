@@ -34,7 +34,8 @@ fn resolve_theme_path<P: AsRef<Path>>(input: P, root: &Path) -> PathBuf {
         return rel_root;
     }
 
-    let in_themes = root.join("themes").join(input_path);
+    let file_name = input_path.file_name().unwrap_or(input_path.as_os_str());
+    let in_themes = root.join("themes").join(file_name);
     if in_themes.exists() {
         return in_themes;
     }
