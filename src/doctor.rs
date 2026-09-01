@@ -101,6 +101,16 @@ impl DoctorReport {
                     drift = true;
                 }
             }
+            if let Ok(content) = fs::read_to_string("kitty/kitty.conf") {
+                if content != theme.generate_kitty_conf() {
+                    drift = true;
+                }
+            }
+            if let Ok(content) = fs::read_to_string("waybar/style.css") {
+                if content != theme.generate_waybar_style() {
+                    drift = true;
+                }
+            }
         }
 
         if !drift {

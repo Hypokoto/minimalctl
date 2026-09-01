@@ -119,6 +119,15 @@ fn main() {
                                 println!(" - kitty/kitty.conf: In sync with source.");
                             }
                         }
+
+                        if let Ok(content) = fs::read_to_string("waybar/style.css") {
+                            if content != theme.generate_waybar_style() {
+                                eprintln!("[!] DRIFT: waybar/style.css differs from compiled obsidian.toml output!");
+                                drift = true;
+                            } else {
+                                println!(" - waybar/style.css: In sync with source.");
+                            }
+                        }
                     }
                     Err(e) => {
                         eprintln!("[!] ERROR: Failed to parse themes/obsidian.toml: {}", e);
