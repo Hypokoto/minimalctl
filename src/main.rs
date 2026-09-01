@@ -10,15 +10,38 @@ use std::path::{Path, PathBuf};
 use theme::Theme;
 
 fn find_repo_root() -> PathBuf {
-    let mut curr = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    loop {
-        if curr.join("waybar").exists() && curr.join("rofi").exists() {
-            return curr;
-        }
-        if !curr.pop() {
-            break;
+    // 1. Search upwards from current working directory
+    if let Ok(mut curr) = std::env::current_dir() {
+        loop {
+            if curr.join("waybar").exists() && curr.join("rofi").exists() && curr.join("themes").exists() {
+                return curr;
+            }
+            if !curr.pop() {
+                break;
+            }
         }
     }
+
+    // 2. Search upwards from binary executable location (handles ~/.local/bin/minimalctl)
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Ok(canonical_exe) = fs::canonicalize(&exe_path) {
+            let mut curr = canonical_exe;
+            while curr.pop() {
+                if curr.join("waybar").exists() && curr.join("rofi").exists() && curr.join("themes").exists() {
+                    return curr;
+                }
+            }
+        }
+    }
+
+    // 3. Fallback to standard dotfiles home location (~/minimal)
+    if let Ok(home) = std::env::var("HOME") {
+        let minimal_dir = PathBuf::from(&home).join("minimal");
+        if minimal_dir.join("themes").exists() {
+            return minimal_dir;
+        }
+    }
+
     std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
