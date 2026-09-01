@@ -116,6 +116,23 @@ impl DoctorReport {
                     drift = true;
                 }
             }
+            if let Ok(content) = fs::read_to_string("btop/btop.theme") {
+                if content != theme.generate_btop_theme() {
+                    drift = true;
+                }
+            }
+            if let Ok(content) = fs::read_to_string("hypr/colors.conf") {
+                if content != theme.generate_hypr_colors() {
+                    drift = true;
+                }
+            }
+            if Path::new("nvim/lua/themes/minimal.lua").exists() {
+                if let Ok(content) = fs::read_to_string("nvim/lua/themes/minimal.lua") {
+                    if content != theme.generate_nvim_theme() {
+                        drift = true;
+                    }
+                }
+            }
         }
 
         if !drift {

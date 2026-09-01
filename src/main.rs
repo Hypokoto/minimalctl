@@ -205,6 +205,36 @@ fn main() {
                                 println!(" - starship/starship.toml: In sync with source.");
                             }
                         }
+
+                        if let Ok(content) = fs::read_to_string(root.join("btop/btop.theme")) {
+                            if content != theme.generate_btop_theme() {
+                                eprintln!("[!] DRIFT: btop/btop.theme differs from compiled obsidian.toml output!");
+                                drift = true;
+                            } else {
+                                println!(" - btop/btop.theme: In sync with source.");
+                            }
+                        }
+
+                        if let Ok(content) = fs::read_to_string(root.join("hypr/colors.conf")) {
+                            if content != theme.generate_hypr_colors() {
+                                eprintln!("[!] DRIFT: hypr/colors.conf differs from compiled obsidian.toml output!");
+                                drift = true;
+                            } else {
+                                println!(" - hypr/colors.conf: In sync with source.");
+                            }
+                        }
+
+                        let nvim_theme_file = root.join("nvim/lua/themes/minimal.lua");
+                        if nvim_theme_file.exists() {
+                            if let Ok(content) = fs::read_to_string(&nvim_theme_file) {
+                                if content != theme.generate_nvim_theme() {
+                                    eprintln!("[!] DRIFT: nvim/lua/themes/minimal.lua differs from compiled obsidian.toml output!");
+                                    drift = true;
+                                } else {
+                                    println!(" - nvim/lua/themes/minimal.lua: In sync with source.");
+                                }
+                            }
+                        }
                     }
                     Err(e) => {
                         eprintln!("[!] ERROR: Failed to parse themes/obsidian.toml: {}", e);
