@@ -73,15 +73,39 @@ impl SystemStatus {
         println!();
         println!("LISTENING SOCKETS");
         println!("  Total                {}", self.sockets.total);
-        println!("  Loopback-only        {} (Isolated)", self.sockets.loopback);
+        println!(
+            "  Loopback-only        {} (Isolated)",
+            self.sockets.loopback
+        );
         println!("  Network-bound        {}", self.sockets.external);
-        println!("    └─ Firewall status {}", if self.firewall_active { "Protected" } else { "Review" });
+        println!(
+            "    └─ Firewall status {}",
+            if self.firewall_active {
+                "Protected"
+            } else {
+                "Review"
+            }
+        );
         println!("  Unknown              0");
         println!();
         println!("SECURITY & INVARIANTS");
-        println!("  nftables Firewall    {}", if self.firewall_active { "PASS (Active)" } else { "WARN (Inactive)" });
+        println!(
+            "  nftables Firewall    {}",
+            if self.firewall_active {
+                "PASS (Active)"
+            } else {
+                "WARN (Inactive)"
+            }
+        );
         println!("  Unknown Listeners    PASS (Justified)");
-        println!("  Failed User Units    {}", if self.failed_user_units == 0 { "PASS (0 failed)".to_string() } else { format!("FAIL ({} failed)", self.failed_user_units) });
+        println!(
+            "  Failed User Units    {}",
+            if self.failed_user_units == 0 {
+                "PASS (0 failed)".to_string()
+            } else {
+                format!("FAIL ({} failed)", self.failed_user_units)
+            }
+        );
         println!("  Process Budget       PASS (Clean)");
         println!();
     }

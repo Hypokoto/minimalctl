@@ -4,6 +4,16 @@ Modular, high-performance Linux desktop environment architecture built for Hyprl
 
 ---
 
+## 📚 Documentation & User Guides
+
+- 📖 **[User Guide](docs/user-guide.md)** — Keybindings, Workspaces, Launchers, Window Rescue, Game Mode, Night Light, Screen OCR, Theme Switching.
+- 🏗️ **[System Architecture](docs/architecture.md)** — Rust `minimalctl` control plane, atomic writes, zero-drift FNV-1a content hash engine.
+- ⌨️ **[Keybindings Reference](docs/keybindings.md)** — Complete Vim spatial navigation & shortcut cheat sheet.
+- 🩺 **[Troubleshooting Guide](docs/troubleshooting.md)** — Operational diagnostics (`minimalctl doctor`), verification, and emergency window recovery.
+
+---
+
+
 ## 🚀 Quick Start & Deployment
 
 ```bash

@@ -43,7 +43,13 @@ impl DoctorReport {
         let banned_procs = ["conky", "nm-applet", "nwg-drawer", "hyprlauncher"];
         let mut found_banned = false;
         for proc in banned_procs {
-            if std::process::Command::new("pgrep").arg("-x").arg(proc).output().map(|o| o.status.success()).unwrap_or(false) {
+            if std::process::Command::new("pgrep")
+                .arg("-x")
+                .arg(proc)
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+            {
                 println!("[FAIL] Banned process running: {}", proc);
                 found_banned = true;
             }
