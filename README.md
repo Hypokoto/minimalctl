@@ -152,7 +152,6 @@ minimal/
 | `SUPER + G` | Toggle Hyprland window tabbed grouping (`hy3`) | Windows |
 | `SUPER + Q` | Close active window | Window Control |
 | `SUPER + F` | Toggle fullscreen window mode | Window Control |
-| `SUPER + V` | Toggle floating window mode | Window Control |
 | `SUPER + B` | Toggle Quickshell Top Bar | Bar |
 | `SUPER + Escape` | Toggle Quickshell Session / Power menu | Session |
 | `SUPER + ALT + Escape` | Lock screen (`hyprlock`) | Security |
