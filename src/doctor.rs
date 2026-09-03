@@ -97,23 +97,8 @@ impl DoctorReport {
         // 7. Theme Drift Check
         let mut drift = false;
         if let Ok(theme) = Theme::load_from_file("themes/obsidian.toml") {
-            if let Ok(content) = fs::read_to_string("mako/config") {
-                if content != theme.generate_mako_config() {
-                    drift = true;
-                }
-            }
-            if let Ok(content) = fs::read_to_string("rofi/theme.rasi") {
-                if content != theme.generate_rofi_theme() {
-                    drift = true;
-                }
-            }
             if let Ok(content) = fs::read_to_string("kitty/kitty.conf") {
                 if content != theme.generate_kitty_conf() {
-                    drift = true;
-                }
-            }
-            if let Ok(content) = fs::read_to_string("waybar/style.css") {
-                if content != theme.generate_waybar_style() {
                     drift = true;
                 }
             }
@@ -144,6 +129,16 @@ impl DoctorReport {
                     }
                 }
             }
+            if let Ok(home) = std::env::var("HOME") {
+                let qs_theme = std::path::PathBuf::from(home).join(".config/quickshell/theme.json");
+                if qs_theme.exists() {
+                    if let Ok(content) = fs::read_to_string(&qs_theme) {
+                        if content != theme.generate_quickshell_theme() {
+                            drift = true;
+                        }
+                    }
+                }
+            }
         }
 
         if !drift {
@@ -151,6 +146,22 @@ impl DoctorReport {
             pass += 1;
         } else {
             println!("[WARN] Theme drift detected in target configs");
+            warn += 1;
+        }
+
+        // 8. Quickshell Environment Check
+        let qs_installed = std::process::Command::new("command")
+            .args(["-v", "quickshell"])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+            || Path::new("/usr/bin/quickshell").exists();
+
+        if qs_installed {
+            println!("[PASS] Quickshell binary available");
+            pass += 1;
+        } else {
+            println!("[WARN] Quickshell binary not found in PATH");
             warn += 1;
         }
 

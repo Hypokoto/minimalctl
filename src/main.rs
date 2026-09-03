@@ -295,42 +295,12 @@ fn main() {
                     Ok(theme) => {
                         println!(" - themes/obsidian.toml: Valid TOML, all hex tokens verified.");
 
-                        if let Ok(content) = fs::read_to_string(root.join("mako/config")) {
-                            if content.contains("padding=14 16") {
-                                eprintln!("[!] ERROR: mako/config contains invalid space-separated padding!");
-                                drift = true;
-                            } else if content != theme.generate_mako_config() {
-                                eprintln!("[!] DRIFT: mako/config differs from compiled obsidian.toml output!");
-                                drift = true;
-                            } else {
-                                println!(" - mako/config: In sync with source.");
-                            }
-                        }
-
-                        if let Ok(content) = fs::read_to_string(root.join("rofi/theme.rasi")) {
-                            if content != theme.generate_rofi_theme() {
-                                eprintln!("[!] DRIFT: rofi/theme.rasi differs from compiled obsidian.toml output!");
-                                drift = true;
-                            } else {
-                                println!(" - rofi/theme.rasi: In sync with source.");
-                            }
-                        }
-
                         if let Ok(content) = fs::read_to_string(root.join("kitty/kitty.conf")) {
                             if content != theme.generate_kitty_conf() {
                                 eprintln!("[!] DRIFT: kitty/kitty.conf differs from compiled obsidian.toml output!");
                                 drift = true;
                             } else {
                                 println!(" - kitty/kitty.conf: In sync with source.");
-                            }
-                        }
-
-                        if let Ok(content) = fs::read_to_string(root.join("waybar/style.css")) {
-                            if content != theme.generate_waybar_style() {
-                                eprintln!("[!] DRIFT: waybar/style.css differs from compiled obsidian.toml output!");
-                                drift = true;
-                            } else {
-                                println!(" - waybar/style.css: In sync with source.");
                             }
                         }
 
@@ -381,6 +351,20 @@ fn main() {
                                     println!(
                                         " - nvim/lua/themes/minimal.lua: In sync with source."
                                     );
+                                }
+                            }
+                        }
+
+                        let quickshell_theme_file = std::env::var("HOME")
+                            .map(|h| std::path::PathBuf::from(h).join(".config/quickshell/theme.json"))
+                            .unwrap_or_else(|_| root.join("quickshell/theme.json"));
+                        if quickshell_theme_file.exists() {
+                            if let Ok(content) = fs::read_to_string(&quickshell_theme_file) {
+                                if content != theme.generate_quickshell_theme() {
+                                    eprintln!("[!] DRIFT: ~/.config/quickshell/theme.json differs from compiled obsidian.toml output!");
+                                    drift = true;
+                                } else {
+                                    println!(" - ~/.config/quickshell/theme.json: In sync with source.");
                                 }
                             }
                         }

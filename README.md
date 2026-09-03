@@ -1,6 +1,6 @@
 # Minimal Dotfiles
 
-Modular, high-performance Linux desktop environment architecture built for Hyprland, Neovim (NvChad), and an AI-native Zsh terminal workspace. Features a refined, premium Bento Grid UI with a 3-pill Waybar design, conditional gaps, and a dedicated Rust-based security tooling layer. Cyan/void palette contract defined in `palette.md`. Multi-distro install support.
+Modular, high-performance Linux desktop environment architecture built for Hyprland, Neovim (NvChad), Quickshell, and an AI-native Zsh terminal workspace. Features a refined, ultra-fast Quickshell presentation layer, native Rust theme control plane (`minimalctl`), Hyprtasking workspace overview, and hy3 tabbed window grouping.
 
 ---
 
@@ -13,7 +13,6 @@ Modular, high-performance Linux desktop environment architecture built for Hyprl
 
 ---
 
-
 ## 🚀 Quick Start & Deployment
 
 ```bash
@@ -23,67 +22,67 @@ cd ~/minimal
 ```
 
 - **`install.sh`**: Multi-distro package installer with distro detection (`pacman`/`apt`/`dnf`/`brew`). On Arch Linux (primary target), installs system binaries, fonts, services, and toolchains via `pacman` + `yay` (AUR). On other distros, skips system package installation but still deploys dotfiles via `deploy.sh`.
-- **`deploy.sh`**: Atomic symlinking pipeline for user dotfiles. Performs binary presence verification, palette target compilation, atomic `.bak.$(date +%s)` rotations, parent directory creation precedence (preventing nested target directory bugs), NvChad custom overlaying, and font cache refreshes (`fc-cache -fv`).
+- **`deploy.sh`**: Idempotent deployment pipeline for user dotfiles. Performs binary presence verification, palette target compilation (`minimalctl theme apply obsidian`), atomic symlinking, NvChad custom overlaying, and font cache refreshes (`fc-cache -fv`). Logged to `/tmp/minimal-deploy.log`.
 
 ---
 
-## 🎨 Color System Automation (`palette.md`)
+## 🎨 Single-Source-of-Truth Theme Engine (`minimalctl`)
 
-`palette.md` serves as the **single source of truth** for all visual color tokens:
+`themes/*.toml` (e.g. `themes/obsidian.toml`) and the `minimalctl` native Rust control plane serve as the **single source of truth** for all desktop color palettes and theme targets.
 
+```bash
+# Build & apply theme transaction across all running components live:
+minimalctl theme apply [theme]
+
+# Verify theme definition and check for target drift:
+minimalctl theme verify
+
+# Run operational diagnostics suite:
+minimalctl doctor
 ```
-Background: #0A0C12 | Surface: #11141D | Overlay: #1C2230 | Text: #F2F6FF
-Muted:      #8D95B3 | Primary: #00D9FF | Secondary: #5B8CFF | Highlight: #A05CFF
-Success:    #4DFF91 | Warning: #FFCC66 | Danger:    #FF5470 | Info:      #61E6FF
-```
 
-### Palette Generator (`hypr/colors.lua`)
-`hypr/colors.lua` is a dual-compatible generator (executes identically under standard Lua 5.4 `lua` and LuaJIT 5.1 `luajit`). It parses `palette.md` and deterministically updates:
-- **`rofi/theme.rasi`**: Centralized Rofi CSS tokens (`* { primary: #00D9FF; ... }`)
-- **`btop/btop.theme`**: TTY resource monitor color mapping table
-- **`kitty/kitty.conf`**: Terminal palette, borders, and tab bar colors
-- **`mako/config`**: Notification frame, progress bar, and urgency colors
+`minimalctl theme apply` compiles 1 canonical source (`themes/*.toml`) into 7 active runtime targets live without logging out or killing session states:
+- `hypr/colors.conf` — Hyprland `$variable` definitions (reloaded live via `hyprctl`)
+- `kitty/kitty.conf` — Terminal palette & chrome (reloaded live via `SIGUSR1`)
+- `btop/btop.theme` — btop TUI color table
+- `starship/starship.toml` — Starship shell prompt (reloaded live on next prompt)
+- `tmux/tmux.conf` & `~/.tmux.conf` — Tmux status bar & pane borders (reloaded live via `tmux source-file` + `tmux refresh-client`)
+- `nvim/lua/themes/minimal.lua` — Neovim NvChad Base46 theme
+- `~/.config/quickshell/theme.json` — Quickshell presentation layer (reloaded live via `quickshell ipc call minimal-shell reloadTheme`)
 
 ---
 
-## 🛠️ Shell Subsystem (`zsh/`)
+## 🐚 Quickshell Presentation Layer (`quickshell/`)
+
+Minimal replaces legacy bar and menu daemons with a unified, lightweight Quickshell layer (`shell.qml`):
+- **Top Bar (`Bar.qml`)**: Workspaces, window title, sys-tray, network, audio, volume, battery, and clock.
+- **App Launcher (`LauncherWindow.qml`)**: 5-column grid app launcher with freedesktop icon evaluation, fuzzy search, and right-click context menu (Open / Pin / Unpin).
+- **Clipboard History Manager (`ClipboardWindow.qml`)**: Quickshell clipboard overlay backed by `cliphist` + `wl-clipboard` featuring fuzzy search, text & image previews, item deletion, and clear history (`SUPER + X`).
+- **Control Center (`ControlCenterWindow.qml`)**: Quick toggles for Wi-Fi, Bluetooth, Audio, Brightness, Game Mode, Night Light, and System Usage graphs (`SUPER + N`).
+- **Workspace Overview (`Hyprtasking`)**: 3x3 interactive workspace grid overview (`SUPER + T` / `SUPER + ~`).
+- **Session Menu (`SidebarWindow.qml`)**: Power menu overlay for shutdown, reboot, suspend, lock, and logout (`SUPER + Escape`).
+
+---
+
+## 🛠️ Zsh Subsystem (`zsh/`)
 
 The Zsh shell environment is configured as a guarded, high-performance workspace:
 
 ### 1. Defensive Alias Architecture (`zsh/aliases.zsh`)
-Every binary alias is wrapped in a `command -v <tool> >/dev/null 2>&1` check to guarantee that the shell never breaks if a package is uninstalled or missing:
+Every binary alias is wrapped in a `command -v <tool> >/dev/null 2>&1` check to guarantee that the shell never breaks if a package is uninstalled:
 - **Listing**: `ls`, `ll`, `la`, `l`, `lt`, `llt` → `eza` (with git & icon support)
 - **File Viewing**: `cat`, `batp` → `bat` (syntax highlighting pager)
 - **Disk Usage**: `df` → `duf`, `du` → `dust`
 - **System Monitoring**: `top` → `btop`
 - **Search**: `grep` → `ripgrep` (`rg`), `find` → `fd`
 - **Safe Deletion**: `rm`, `tp`, `tl`, `tr` → `trash-cli` / `trash-put` (with `rmf` for raw `/bin/rm -iv`)
-- **Safety Overrides**: `cp -iv`, `mv -iv`, `mkdir -pv`
 - **Navigation & Reloader**: `..`, `...`, `....`, `-`, `reload`, `ezsh`, `ealias`
 
 ### 2. Rust Security & Networking Layer (`zsh/sec.zsh`)
-A dedicated suite of modern, high-performance security tooling implemented in Rust:
+Dedicated security and networking aliases:
 - **Recon & Fuzzing**: `rustscan` (fast Nmap hand-off) and `feroxbuster` (web content discovery).
 - **Monitoring & Discovery**: `sniffnet` (TUI traffic monitor), `bandwhich`, `trippy` (traceroute), and `netscanner` (ARP LAN discovery).
 - **Analysis**: `hexyl` (hex viewer) and `cargo-audit` (RustSec CVE scanner).
-- **Hardening Pipeline**: `harden` (deploys local sysctl CVE mitigations and updates the kernel).
-- *All tools are accessible via `zsh/sec.zsh` aliases. Network stats and security vitals are visible via the Standalone Conky HUD (`SUPER+S`).*
-
-### 3. Agent Safety & Hooks (`zsh/.zshrc`)
-- **Bracketed Paste Protection**: Enables `bracketed-paste-magic` so multi-line code snippets pasted by external AI agents (Aider, Claude Code, OpenCode) drop into the prompt buffer as editable text without auto-executing.
-- **Engine Integrations**: `atuin` (SQLite-backed history search), `zoxide` (frecent directory jump), `starship` (Minimal prompt engine), `zsh-autosuggestions`, and `zsh-syntax-highlighting`.
-
----
-
-## 🖥️ Desktop & Rofi Suite
-
-- **Hyprland Engine**: Modern block window rules (`windowrule`), gesture workspace switching, and isolated hardware environment flags. 
-- **Bento UI Toggle**: Pressing `SUPER+B` dynamically toggles the 3-pill Waybar visibility while simultaneously manipulating Hyprland's internal gaps and window rounding settings (via `toggle-bar.sh`), transforming the environment from a gapless focus mode to a padded bento grid dynamically.
-- **OSD Latency Optimization**: `osd-volume.sh` and `osd-brightness.sh` execute through `makoctl` using explicit replaceable notification IDs (`-r 91110` / `-r 91111`) and synchronous hint `-h string:x-canonical-private-synchronous:osd` to eliminate stack delays.
-- **Rofi Integration Suite**:
-  - `rofi/scripts/clipboard.sh`: Interfaced with `cliphist` + `wl-clipboard` (list, decode, copy, `Alt+Delete` deletion).
-  - `rofi/scripts/powermenu.sh`: Interfaced with `hyprctl dispatch exit`, `systemctl suspend`, `reboot`, and `poweroff`.
-  - `rofi/scripts/wallpaper.sh`: Bridge to `hypr/wallpaper/picker.sh` for `awww` hot-reloading.
 
 ---
 
@@ -91,49 +90,47 @@ A dedicated suite of modern, high-performance security tooling implemented in Ru
 
 ```
 minimal/
-├── install.sh                     # Multi-distro package installer (pacman/apt/dnf/brew)
+├── install.sh                     # Arch system setup script (pacman + yay + deploy)
 ├── deploy.sh                      # Idempotent symlinker & NvChad overlay pipeline
-├── palette.md                     # Color contract single source of truth
+├── LICENSE                        # GNU General Public License v3.0
 ├── README.md                      # Repository documentation
+├── Cargo.toml / src/              # minimalctl native Rust control plane
 ├── btop/
-│   └── btop.theme                 # Compiled from palette.md
+│   └── btop.theme                 # Compiled from themes/*.toml
 ├── fastfetch/
 │   └── config.jsonc               # Fastfetch system info layout
 ├── git/
 │   └── config                     # Git & delta syntax pager configuration
 ├── hypr/
-│   ├── colors.lua                 # Palette compiler (Lua 5.1 & 5.4 compatible)
 │   ├── hyprland.lua               # Core Hyprland compositor entry point (Lua)
-│   ├── hypridle.conf / hyprlock.conf
 │   ├── keybinds.lua               # Global keybindings & media pipeline (Lua)
 │   ├── monitors.lua               # Display rules & monitor topology (Lua)
-│   ├── wallpaper/                 # awww wallpaper picker & daemon scripts
-│   └── scripts/
-│       ├── osd-volume.sh          # Volume OSD widget (-r 91110)
-│       └── osd-brightness.sh      # Brightness OSD widget (-r 91111)
+│   └── wallpaper/                 # Wallpaper picker & daemon scripts
 ├── kitty/
 │   └── kitty.conf                 # Terminal config & compiled colors
-├── mako/
-│   └── config                     # Notification daemon config & compiled colors
 ├── nvim/
 │   ├── ftplugin/java.lua          # Prioritized JDK 21 OpenJDK discovery logic
-│   ├── lua/autocmds.lua           # Auto-open snacks.dashboard on buffer close
 │   ├── lua/chadrc.lua             # NvChad entry point
-│   ├── lua/mappings.lua           # Guarded close_buffer and nvim-tree toggle
-│   └── lua/themes/minimal.lua    # Base46 theme matching palette.md
-├── rofi/
-│   ├── theme.rasi                 # Centralized Rofi CSS token theme
-│   └── scripts/
-│       ├── clipboard.sh           # Cliphist clipboard manager
-│       ├── powermenu.sh           # Hyprland session power menu
-│       └── wallpaper.sh           # Wallpaper dashboard bridge
+│   └── lua/themes/minimal.lua    # Base46 theme compiled from themes/*.toml
+├── quickshell/
+│   ├── shell.qml                  # Main IPC entry point & service initialization
+│   ├── modules/
+│   │   ├── bar/Bar.qml            # Top bar component
+│   │   ├── launcher/              # Grid launcher component
+│   │   ├── clipboard/             # Clipboard history manager component
+│   │   ├── controlcenter/        # Quick settings control center
+│   │   └── osd/                   # OSD volume and brightness overlays
+│   └── services/                  # Quickshell singletons (CliphistService, Pywal, etc.)
 ├── starship/
 │   └── starship.toml              # Starship prompt configuration
+├── themes/
+│   ├── obsidian.toml              # Default dark cyan/void theme source
+│   ├── gruvbox.toml
+│   ├── synthwave.toml
+│   ├── catpuccin.toml
+│   └── ayu-dark.toml
 ├── tmux/
 │   └── tmux.conf                  # Tmux terminal multiplexer configuration
-├── waybar/
-│   ├── config.jsonc               # Waybar panel layout
-│   └── style.css                  # Waybar CSS styling
 ├── yazi/
 │   └── yazi.toml                  # Yazi file manager configuration
 └── zsh/
@@ -143,22 +140,21 @@ minimal/
 
 ---
 
-## ⌨️ Keybindings Reference
+## ⌨️ Keybindings Quick Reference
 
-| Key Combo | Action |
-|---|---|
-| `SUPER + Return` | Launch Kitty terminal |
-| `SUPER + Space` | Launch Rofi launcher |
-| `SUPER + Q` | Close active window |
-| `SUPER + F` | Toggle fullscreen |
-| `SUPER + V` | Toggle floating mode |
-| `SUPER + B` | Toggle Waybar and Dynamic Bento Gaps |
-| `SUPER + S` | Toggle Standalone Conky HUD |
-| `SUPER + X` | Launch Rofi clipboard history (`cliphist`) |
-| `SUPER + W` | Launch Rofi wallpaper picker (`awww`) |
-| `SUPER + Escape` | Launch Rofi power menu |
-| `SUPER + SHIFT + L` | Lock screen (`hyprlock`) |
-| `SUPER + H / J / K / L` | Vim-style window focus navigation |
-| `SUPER + 1..9` | Switch workspace |
-| `SUPER + SHIFT + 1..9` | Move window to workspace |
-| `XF86Audio*` / `XF86MonBrightness*` | Media controls + zero-latency OSD |
+| Key Combo | Action | Component |
+|---|---|---|
+| `SUPER + Return` | Launch Kitty terminal | Terminal |
+| `SUPER + Space` | Toggle Quickshell App Grid Launcher | Launcher |
+| `SUPER + X` | Toggle Quickshell Clipboard Manager | Clipboard |
+| `SUPER + N` | Toggle Quickshell Control Center | Quick Settings |
+| `SUPER + T` / `SUPER + ~` | Toggle Hyprtasking 3x3 workspace grid overview | Workspaces |
+| `SUPER + G` | Toggle Hyprland window tabbed grouping (`hy3`) | Windows |
+| `SUPER + Q` | Close active window | Window Control |
+| `SUPER + F` | Toggle fullscreen window mode | Window Control |
+| `SUPER + V` | Toggle floating window mode | Window Control |
+| `SUPER + B` | Toggle Quickshell Top Bar | Bar |
+| `SUPER + Escape` | Toggle Quickshell Session / Power menu | Session |
+| `SUPER + ALT + Escape` | Lock screen (`hyprlock`) | Security |
+| `SUPER + SHIFT + G` | Toggle Game Mode (disable blur/animations) | Performance |
+| `SUPER + SHIFT + X` | Screen OCR text extractor to clipboard | Utilities |
