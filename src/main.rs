@@ -13,10 +13,7 @@ fn find_repo_root() -> PathBuf {
     // 1. Search upwards from current working directory
     if let Ok(mut curr) = std::env::current_dir() {
         loop {
-            if curr.join("waybar").exists()
-                && curr.join("rofi").exists()
-                && curr.join("themes").exists()
-            {
+            if curr.join("quickshell").exists() && curr.join("themes").exists() {
                 return curr;
             }
             if !curr.pop() {
@@ -26,14 +23,11 @@ fn find_repo_root() -> PathBuf {
     }
 
     // 2. Search upwards from binary executable location (handles ~/.local/bin/minimalctl)
-    if let Ok(exe_path) = std::env::current_exe() {
+    if let Ok(exe_path) = std::env::var("HOME").map(|h| PathBuf::from(h).join(".local/bin/minimalctl")) {
         if let Ok(canonical_exe) = fs::canonicalize(&exe_path) {
             let mut curr = canonical_exe;
             while curr.pop() {
-                if curr.join("waybar").exists()
-                    && curr.join("rofi").exists()
-                    && curr.join("themes").exists()
-                {
+                if curr.join("quickshell").exists() && curr.join("themes").exists() {
                     return curr;
                 }
             }
@@ -389,7 +383,7 @@ fn main() {
             ConfigActions::Verify => {
                 println!("=== REPOSITORY CONFIGURATION VERIFICATION ===");
                 let required_dirs = [
-                    "hypr", "waybar", "rofi", "kitty", "mako", "tmux", "zsh", "starship", "btop",
+                    "hypr", "quickshell", "kitty", "tmux", "zsh", "starship", "btop", "themes", "icons",
                 ];
                 let mut valid = true;
 

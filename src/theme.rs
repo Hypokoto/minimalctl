@@ -2,6 +2,48 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+fn default_disabled() -> String { "#475569".to_string() }
+fn default_selection() -> String { "#1E293B".to_string() }
+fn default_hover() -> String { "#243144".to_string() }
+fn default_pressed() -> String { "#0F172A".to_string() }
+fn default_focus() -> String { "#38BDF8".to_string() }
+fn default_panel() -> String { "#0F141C".to_string() }
+fn default_panel_variant() -> String { "#151C28".to_string() }
+
+fn default_icon_role_text() -> String { "text".to_string() }
+fn default_icon_role_primary() -> String { "primary".to_string() }
+fn default_icon_role_muted() -> String { "muted".to_string() }
+fn default_icon_role_disabled() -> String { "disabled".to_string() }
+fn default_icon_role_success() -> String { "success".to_string() }
+fn default_icon_role_warning() -> String { "warning".to_string() }
+fn default_icon_role_danger() -> String { "danger".to_string() }
+fn default_icon_role_info() -> String { "info".to_string() }
+
+fn default_radius_sm() -> u32 { 6 }
+fn default_radius_md() -> u32 { 12 }
+fn default_radius_lg() -> u32 { 18 }
+
+fn default_spacing_xs() -> u32 { 4 }
+fn default_spacing_sm() -> u32 { 8 }
+fn default_spacing_md() -> u32 { 12 }
+fn default_spacing_lg() -> u32 { 16 }
+fn default_spacing_xl() -> u32 { 24 }
+
+fn default_font() -> String { "Adwaita Sans".to_string() }
+fn default_mono() -> String { "AdwaitaMono Nerd Font".to_string() }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct QuickshellIconRoles {
+    pub default: String,
+    pub active: String,
+    pub muted: String,
+    pub disabled: String,
+    pub success: String,
+    pub warning: String,
+    pub error: String,
+    pub info: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct QuickshellPalette {
     pub background: String,
@@ -9,6 +51,7 @@ pub struct QuickshellPalette {
     pub overlay: String,
     pub text: String,
     pub muted: String,
+    pub disabled: String,
     pub primary: String,
     pub secondary: String,
     pub highlight: String,
@@ -16,6 +59,12 @@ pub struct QuickshellPalette {
     pub warning: String,
     pub danger: String,
     pub info: String,
+    pub selection: String,
+    pub hover: String,
+    pub pressed: String,
+    pub focus: String,
+    pub panel: String,
+    pub panel_variant: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -33,6 +82,7 @@ pub struct QuickshellThemeConfig {
     pub name: String,
     pub mode: String,
     pub palette: QuickshellPalette,
+    pub icon: QuickshellIconRoles,
     pub metrics: QuickshellMetrics,
 }
 
@@ -43,6 +93,8 @@ pub struct ThemeTokens {
     pub overlay: String,
     pub text: String,
     pub muted: String,
+    #[serde(default = "default_disabled")]
+    pub disabled: String,
     pub primary: String,
     pub secondary: String,
     pub highlight: String,
@@ -50,6 +102,70 @@ pub struct ThemeTokens {
     pub warning: String,
     pub danger: String,
     pub info: String,
+    #[serde(default = "default_selection")]
+    pub selection: String,
+    #[serde(default = "default_hover")]
+    pub hover: String,
+    #[serde(default = "default_pressed")]
+    pub pressed: String,
+    #[serde(default = "default_focus")]
+    pub focus: String,
+    #[serde(default = "default_panel")]
+    pub panel: String,
+    #[serde(default = "default_panel_variant")]
+    pub panel_variant: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct IconRoles {
+    #[serde(default = "default_icon_role_text")]
+    pub default: String,
+    #[serde(default = "default_icon_role_primary")]
+    pub active: String,
+    #[serde(default = "default_icon_role_muted")]
+    pub muted: String,
+    #[serde(default = "default_icon_role_disabled")]
+    pub disabled: String,
+    #[serde(default = "default_icon_role_success")]
+    pub success: String,
+    #[serde(default = "default_icon_role_warning")]
+    pub warning: String,
+    #[serde(default = "default_icon_role_danger")]
+    pub error: String,
+    #[serde(default = "default_icon_role_info")]
+    pub info: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ThemeGeometry {
+    #[serde(default = "default_radius_sm")]
+    pub radius_sm: u32,
+    #[serde(default = "default_radius_md")]
+    pub radius_md: u32,
+    #[serde(default = "default_radius_lg")]
+    pub radius_lg: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ThemeSpacing {
+    #[serde(default = "default_spacing_xs")]
+    pub xs: u32,
+    #[serde(default = "default_spacing_sm")]
+    pub sm: u32,
+    #[serde(default = "default_spacing_md")]
+    pub md: u32,
+    #[serde(default = "default_spacing_lg")]
+    pub lg: u32,
+    #[serde(default = "default_spacing_xl")]
+    pub xl: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ThemeTypography {
+    #[serde(default = "default_font")]
+    pub font: String,
+    #[serde(default = "default_mono")]
+    pub mono: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -63,6 +179,14 @@ pub struct ThemeMeta {
 pub struct Theme {
     pub meta: ThemeMeta,
     pub tokens: ThemeTokens,
+    #[serde(default)]
+    pub icon_roles: Option<IconRoles>,
+    #[serde(default)]
+    pub geometry: Option<ThemeGeometry>,
+    #[serde(default)]
+    pub spacing: Option<ThemeSpacing>,
+    #[serde(default)]
+    pub typography: Option<ThemeTypography>,
 }
 
 impl Theme {
@@ -83,6 +207,7 @@ impl Theme {
             ("overlay", &self.tokens.overlay),
             ("text", &self.tokens.text),
             ("muted", &self.tokens.muted),
+            ("disabled", &self.tokens.disabled),
             ("primary", &self.tokens.primary),
             ("secondary", &self.tokens.secondary),
             ("highlight", &self.tokens.highlight),
@@ -90,6 +215,12 @@ impl Theme {
             ("warning", &self.tokens.warning),
             ("danger", &self.tokens.danger),
             ("info", &self.tokens.info),
+            ("selection", &self.tokens.selection),
+            ("hover", &self.tokens.hover),
+            ("pressed", &self.tokens.pressed),
+            ("focus", &self.tokens.focus),
+            ("panel", &self.tokens.panel),
+            ("panel_variant", &self.tokens.panel_variant),
         ];
 
         for (name, val) in tokens.iter() {
@@ -104,7 +235,7 @@ impl Theme {
         format!(
             r#"# Minimal Kitty Config — Bento Aesthetics
 # Generated by minimalctl — DO NOT edit directly.
-font_family      AdwaitaMono Nerd Font
+font_family      {}
 bold_font        auto
 italic_font      auto
 font_size        11.0
@@ -157,6 +288,7 @@ inactive_tab_foreground {}
 allow_remote_control yes
 enabled_layouts tall,fat,grid,stack
 "#,
+            self.typography.as_ref().map(|t| t.mono.as_str()).unwrap_or("AdwaitaMono Nerd Font"),
             self.tokens.text,
             self.tokens.background,
             self.tokens.background,
@@ -697,15 +829,30 @@ set -g mode-style "fg={},bg={}"
     }
 
     pub fn generate_quickshell_theme(&self) -> String {
+        let icon_roles = QuickshellIconRoles {
+            default: self.icon_roles.as_ref().map(|i| i.default.clone()).unwrap_or_else(|| "text".to_string()),
+            active: self.icon_roles.as_ref().map(|i| i.active.clone()).unwrap_or_else(|| "primary".to_string()),
+            muted: self.icon_roles.as_ref().map(|i| i.muted.clone()).unwrap_or_else(|| "muted".to_string()),
+            disabled: self.icon_roles.as_ref().map(|i| i.disabled.clone()).unwrap_or_else(|| "disabled".to_string()),
+            success: self.icon_roles.as_ref().map(|i| i.success.clone()).unwrap_or_else(|| "success".to_string()),
+            warning: self.icon_roles.as_ref().map(|i| i.warning.clone()).unwrap_or_else(|| "warning".to_string()),
+            error: self.icon_roles.as_ref().map(|i| i.error.clone()).unwrap_or_else(|| "danger".to_string()),
+            info: self.icon_roles.as_ref().map(|i| i.info.clone()).unwrap_or_else(|| "info".to_string()),
+        };
+
+        let radius = self.geometry.as_ref().map(|g| g.radius_md).unwrap_or(12);
+        let font_fam = self.typography.as_ref().map(|t| t.font.clone()).unwrap_or_else(|| "Adwaita Sans".to_string());
+
         let config = QuickshellThemeConfig {
             name: self.meta.name.clone(),
-            mode: "dark".to_string(),
+            mode: if self.meta.name.contains("light") { "light".to_string() } else { "dark".to_string() },
             palette: QuickshellPalette {
                 background: self.tokens.background.clone(),
                 surface: self.tokens.surface.clone(),
                 overlay: self.tokens.overlay.clone(),
                 text: self.tokens.text.clone(),
                 muted: self.tokens.muted.clone(),
+                disabled: self.tokens.disabled.clone(),
                 primary: self.tokens.primary.clone(),
                 secondary: self.tokens.secondary.clone(),
                 highlight: self.tokens.highlight.clone(),
@@ -713,17 +860,100 @@ set -g mode-style "fg={},bg={}"
                 warning: self.tokens.warning.clone(),
                 danger: self.tokens.danger.clone(),
                 info: self.tokens.info.clone(),
+                selection: self.tokens.selection.clone(),
+                hover: self.tokens.hover.clone(),
+                pressed: self.tokens.pressed.clone(),
+                focus: self.tokens.focus.clone(),
+                panel: self.tokens.panel.clone(),
+                panel_variant: self.tokens.panel_variant.clone(),
             },
+            icon: icon_roles,
             metrics: QuickshellMetrics {
-                border_radius: 12,
+                border_radius: radius,
                 pill_padding_h: 16,
                 pill_padding_v: 8,
                 bar_height: 40,
                 bar_mode: "full".to_string(),
-                font_family: "Adwaita Sans".to_string(),
+                font_family: font_fam,
             },
         };
         serde_json::to_string_pretty(&config).unwrap_or_default()
+    }
+
+    pub fn generate_gtk_settings(&self) -> String {
+        let is_dark = if self.meta.name.contains("light") { "0" } else { "1" };
+        let theme_name = if self.meta.name.contains("light") { "Adwaita" } else { "Adwaita-dark" };
+        let font = self.typography.as_ref().map(|t| t.font.as_str()).unwrap_or("Adwaita Sans");
+        format!(
+            r#"[Settings]
+gtk-theme-name={}
+gtk-icon-theme-name=Aetheria
+gtk-application-prefer-dark-theme={}
+gtk-font-name={} 11
+"#,
+            theme_name, is_dark, font
+        )
+    }
+
+    pub fn generate_gtk_css(&self) -> String {
+        format!(
+            r#"/* Minimal GTK Theme Overrides — Generated by minimalctl */
+@define-color theme_bg_color {};
+@define-color theme_fg_color {};
+@define-color theme_selected_bg_color {};
+@define-color theme_selected_fg_color {};
+@define-color theme_base_color {};
+@define-color theme_text_color {};
+"#,
+            self.tokens.background,
+            self.tokens.text,
+            self.tokens.primary,
+            self.tokens.background,
+            self.tokens.surface,
+            self.tokens.text
+        )
+    }
+
+    pub fn generate_qtct_conf(&self) -> String {
+        format!(
+            r#"[Appearance]
+icon_theme=Aetheria
+style=Fusion
+standard_dialogs=default
+"#,
+        )
+    }
+
+    pub fn install_icon_theme<P: AsRef<Path>>(root_dir: P) -> Result<(), String> {
+        let root = root_dir.as_ref();
+        let src_aetheria = root.join("icons/dist/Aetheria");
+        if !src_aetheria.exists() {
+            return Ok(());
+        }
+
+        let home = std::env::var("HOME").map_err(|e| e.to_string())?;
+        let icons_dest = PathBuf::from(&home).join(".local/share/icons/Aetheria");
+
+        if let Err(e) = fs::create_dir_all(&icons_dest) {
+            return Err(format!("Failed to create icon directory {}: {}", icons_dest.display(), e));
+        }
+
+        fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
+            fs::create_dir_all(dst)?;
+            for entry in fs::read_dir(src)? {
+                let entry = entry?;
+                let ty = entry.file_type()?;
+                if ty.is_dir() {
+                    copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
+                } else {
+                    fs::copy(entry.path(), dst.join(entry.file_name()))?;
+                }
+            }
+            Ok(())
+        }
+
+        copy_dir_all(&src_aetheria, &icons_dest).map_err(|e| format!("Failed to copy Aetheria icon theme: {}", e))?;
+        Ok(())
     }
 
     pub fn atomic_write<P: AsRef<Path>>(path: P, content: &str) -> Result<(), String> {
@@ -809,6 +1039,29 @@ set -g mode-style "fg={},bg={}"
         if nvim_theme_dir.exists() {
             Self::atomic_write(nvim_theme_dir.join("minimal.lua"), &self.generate_nvim_theme())?;
         }
+
+        // GTK & Qt theme targets
+        if let Ok(home) = std::env::var("HOME") {
+            let home_path = PathBuf::from(&home);
+            let gtk3_dir = home_path.join(".config/gtk-3.0");
+            let gtk4_dir = home_path.join(".config/gtk-4.0");
+            let qt5_dir = home_path.join(".config/qt5ct");
+            let qt6_dir = home_path.join(".config/qt6ct");
+
+            let gtk_settings = self.generate_gtk_settings();
+            let gtk_css = self.generate_gtk_css();
+            let qt_conf = self.generate_qtct_conf();
+
+            Self::atomic_write(gtk3_dir.join("settings.ini"), &gtk_settings)?;
+            Self::atomic_write(gtk3_dir.join("gtk.css"), &gtk_css)?;
+            Self::atomic_write(gtk4_dir.join("settings.ini"), &gtk_settings)?;
+            Self::atomic_write(gtk4_dir.join("gtk.css"), &gtk_css)?;
+            Self::atomic_write(qt5_dir.join("qt5ct.conf"), &qt_conf)?;
+            Self::atomic_write(qt6_dir.join("qt6ct.conf"), &qt_conf)?;
+        }
+
+        // Install Aetheria icon theme
+        Self::install_icon_theme(root)?;
 
         Ok(())
     }
@@ -899,7 +1152,7 @@ set -g mode-style "fg={},bg={}"
             println!("[INFO] Kitty: Not running (applies on new windows)");
         }
 
-        // 6. Hyprland: Dynamic border keyword update without session restart
+        // 3. Hyprland: Dynamic border keyword update without session restart
         if std::process::Command::new("pgrep")
             .arg("-x")
             .arg("Hyprland")
@@ -923,14 +1176,14 @@ set -g mode-style "fg={},bg={}"
             println!("[INFO] Hyprland: Not running");
         }
 
-        // 7. Tmux: Target-aware hot reload (tmux source-file + refresh-client)
+        // 4. Tmux: Target-aware hot reload (tmux source-file + refresh-client)
         let tmux_active = std::process::Command::new("tmux")
             .arg("ls")
             .output()
             .map(|o| o.status.success())
             .unwrap_or(false);
 
-        // 8. Quickshell: Target-aware live reload
+        // 5. Quickshell: Target-aware live reload
         if std::process::Command::new("pgrep")
             .arg("-x")
             .arg("quickshell")
@@ -994,6 +1247,7 @@ mod tests {
                 overlay: "#19212D".into(),
                 text: "#E8EDF5".into(),
                 muted: "#7F899B".into(),
+                disabled: "#475569".into(),
                 primary: "#7DD3FC".into(),
                 secondary: "#8BA4FF".into(),
                 highlight: "#B4A7FF".into(),
@@ -1001,7 +1255,17 @@ mod tests {
                 warning: "#E8C77B".into(),
                 danger: "#F08080".into(),
                 info: "#7DD3FC".into(),
+                selection: "#1E293B".into(),
+                hover: "#243144".into(),
+                pressed: "#0F172A".into(),
+                focus: "#38BDF8".into(),
+                panel: "#0F141C".into(),
+                panel_variant: "#151C28".into(),
             },
+            icon_roles: None,
+            geometry: None,
+            spacing: None,
+            typography: None,
         };
 
         let style1 = theme.generate_quickshell_theme();
@@ -1027,6 +1291,7 @@ mod tests {
                 overlay: "#19212D".into(),
                 text: "#E8EDF5".into(),
                 muted: "#7F899B".into(),
+                disabled: "#475569".into(),
                 primary: "#7DD3FC".into(),
                 secondary: "#8BA4FF".into(),
                 highlight: "#B4A7FF".into(),
@@ -1034,7 +1299,17 @@ mod tests {
                 warning: "#E8C77B".into(),
                 danger: "#F08080".into(),
                 info: "#7DD3FC".into(),
+                selection: "#1E293B".into(),
+                hover: "#243144".into(),
+                pressed: "#0F172A".into(),
+                focus: "#38BDF8".into(),
+                panel: "#0F141C".into(),
+                panel_variant: "#151C28".into(),
             },
+            icon_roles: None,
+            geometry: None,
+            spacing: None,
+            typography: None,
         };
         assert!(theme.validate().is_ok());
 
@@ -1066,6 +1341,7 @@ mod tests {
                 overlay: "#19212D".into(),
                 text: "#E8EDF5".into(),
                 muted: "#7F899B".into(),
+                disabled: "#475569".into(),
                 primary: "#7DD3FC".into(),
                 secondary: "#8BA4FF".into(),
                 highlight: "#B4A7FF".into(),
@@ -1073,7 +1349,17 @@ mod tests {
                 warning: "#E8C77B".into(),
                 danger: "#F08080".into(),
                 info: "#7DD3FC".into(),
+                selection: "#1E293B".into(),
+                hover: "#243144".into(),
+                pressed: "#0F172A".into(),
+                focus: "#38BDF8".into(),
+                panel: "#0F141C".into(),
+                panel_variant: "#151C28".into(),
             },
+            icon_roles: None,
+            geometry: None,
+            spacing: None,
+            typography: None,
         };
         let json_str = theme.generate_quickshell_theme();
         assert!(json_str.contains("\"background\": \"#0B0E14\""));
@@ -1095,6 +1381,7 @@ mod tests {
                 overlay: "#19212D".into(),
                 text: "#E8EDF5".into(),
                 muted: "#7F899B".into(),
+                disabled: "#475569".into(),
                 primary: "#7DD3FC".into(),
                 secondary: "#8BA4FF".into(),
                 highlight: "#B4A7FF".into(),
@@ -1102,12 +1389,101 @@ mod tests {
                 warning: "#E8C77B".into(),
                 danger: "#F08080".into(),
                 info: "#7DD3FC".into(),
+                selection: "#1E293B".into(),
+                hover: "#243144".into(),
+                pressed: "#0F172A".into(),
+                focus: "#38BDF8".into(),
+                panel: "#0F141C".into(),
+                panel_variant: "#151C28".into(),
             },
+            icon_roles: None,
+            geometry: None,
+            spacing: None,
+            typography: None,
         };
 
         let hash1 = theme.compute_hash();
         let hash2 = theme.compute_hash();
         assert_eq!(hash1, hash2);
         assert_eq!(hash1.len(), 16);
+    }
+
+    #[test]
+    fn test_icon_svg_validity_and_index_theme() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let index_path = root.join("icons/dist/Aetheria/index.theme");
+        assert!(index_path.exists(), "Aetheria index.theme must exist");
+
+        let content = fs::read_to_string(&index_path).expect("Read index.theme");
+        assert!(content.contains("Name=Aetheria"));
+        assert!(content.contains("Inherits=Adwaita,hicolor"));
+
+        let scalable_dir = root.join("icons/dist/Aetheria/scalable");
+        assert!(scalable_dir.exists());
+
+        // Check essential icons exist and contain valid XML/viewBox
+        let essential_icons = [
+            "actions/add.svg",
+            "actions/close.svg",
+            "actions/search.svg",
+            "status/battery.svg",
+            "status/network-wifi.svg",
+            "status/volume.svg",
+            "devices/computer.svg",
+            "places/folder.svg",
+            "apps/quickshell.svg",
+        ];
+
+        for icon_rel in essential_icons.iter() {
+            let path = scalable_dir.join(icon_rel);
+            assert!(path.exists(), "Missing essential icon SVG: {}", icon_rel);
+            let svg_str = fs::read_to_string(&path).expect("Read SVG");
+            assert!(svg_str.contains("viewBox=\"0 0 24 24\""));
+            assert!(svg_str.contains("<svg"));
+            assert!(svg_str.contains("</svg>"));
+        }
+    }
+
+    #[test]
+    fn test_gtk_and_qt_generation() {
+        let theme = Theme {
+            meta: ThemeMeta {
+                name: "obsidian".into(),
+                author: "Hypokoto".into(),
+                description: "Test".into(),
+            },
+            tokens: ThemeTokens {
+                background: "#0B0E14".into(),
+                surface: "#11161F".into(),
+                overlay: "#19212D".into(),
+                text: "#E8EDF5".into(),
+                muted: "#7F899B".into(),
+                disabled: "#475569".into(),
+                primary: "#7DD3FC".into(),
+                secondary: "#8BA4FF".into(),
+                highlight: "#B4A7FF".into(),
+                success: "#8BE28B".into(),
+                warning: "#E8C77B".into(),
+                danger: "#F08080".into(),
+                info: "#7DD3FC".into(),
+                selection: "#1E293B".into(),
+                hover: "#243144".into(),
+                pressed: "#0F172A".into(),
+                focus: "#38BDF8".into(),
+                panel: "#0F141C".into(),
+                panel_variant: "#151C28".into(),
+            },
+            icon_roles: None,
+            geometry: None,
+            spacing: None,
+            typography: None,
+        };
+
+        let gtk = theme.generate_gtk_settings();
+        assert!(gtk.contains("gtk-icon-theme-name=Aetheria"));
+        assert!(gtk.contains("gtk-application-prefer-dark-theme=1"));
+
+        let qt = theme.generate_qtct_conf();
+        assert!(qt.contains("icon_theme=Aetheria"));
     }
 }
