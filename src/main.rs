@@ -94,6 +94,11 @@ enum Commands {
         #[command(subcommand)]
         action: ThemeActions,
     },
+    /// Icon theme color inspection and dynamic role modification
+    Icon {
+        #[command(subcommand)]
+        action: IconActions,
+    },
     /// Repository configuration verification suite
     Config {
         #[command(subcommand)]
@@ -105,6 +110,23 @@ enum Commands {
 enum ConfigActions {
     /// Verify repository symlinks and configuration file structure
     Verify,
+}
+
+#[derive(Subcommand, Clone)]
+enum IconActions {
+    /// List icon roles, token mappings, and resolved hex colors
+    List,
+    /// Get resolved color for a specific icon role (e.g. minimalctl icon get active)
+    Get {
+        role: String,
+    },
+    /// Set color or token for an icon role and apply live (e.g. minimalctl icon set active #7DD3FC)
+    Set {
+        role: String,
+        color: String,
+    },
+    /// Reset icon roles to theme default tokens
+    Reset,
 }
 
 #[derive(Subcommand)]
@@ -133,6 +155,13 @@ enum ThemeActions {
     Apply {
         #[arg(default_value = "themes/obsidian.toml")]
         path: String,
+    },
+    /// Run single-pass diagnostic checklist across theme and icon system pipelines
+    Doctor,
+    /// Manage icon role colors (alias for minimalctl icon)
+    Icon {
+        #[command(subcommand)]
+        action: IconActions,
     },
 }
 
@@ -262,6 +291,11 @@ fn main() {
                     }
                 }
             }
+            ThemeActions::Doctor => {
+                if let Err(_) = Theme::run_doctor(&root) {
+                    std::process::exit(1);
+                }
+            }
             ThemeActions::List => {
                 println!("=== AVAILABLE THEMES ===");
                 let themes_dir = root.join("themes");
@@ -378,7 +412,13 @@ fn main() {
                     );
                 }
             }
+            ThemeActions::Icon { action } => {
+                handle_icon_action(action, &root);
+            }
         },
+        Commands::Icon { action } => {
+            handle_icon_action(action, &root);
+        }
         Commands::Config { action } => match action {
             ConfigActions::Verify => {
                 println!("=== REPOSITORY CONFIGURATION VERIFICATION ===");
@@ -419,5 +459,132 @@ fn main() {
                 }
             }
         },
+    }
+}
+
+fn handle_icon_action(action: IconActions, root: &Path) {
+    let active_theme_path = root.join("themes/obsidian.toml");
+    let mut theme = match Theme::load_from_file(&active_theme_path) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("[!] Failed to load active theme: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    match action {
+        IconActions::List => {
+            println!("=== MINIMAL ICON COLOR ROLES ===");
+            let roles = theme.icon_roles.clone().unwrap_or_else(|| theme::IconRoles {
+                default: "text".into(),
+                active: "primary".into(),
+                muted: "muted".into(),
+                disabled: "disabled".into(),
+                success: "success".into(),
+                warning: "warning".into(),
+                error: "danger".into(),
+                info: "info".into(),
+            });
+
+            let items = [
+                ("default", &roles.default),
+                ("active", &roles.active),
+                ("muted", &roles.muted),
+                ("disabled", &roles.disabled),
+                ("success", &roles.success),
+                ("warning", &roles.warning),
+                ("error", &roles.error),
+                ("info", &roles.info),
+            ];
+
+            for (name, val) in items.iter() {
+                let resolved = theme.resolve_icon_color(val);
+                println!(" - {:<10} : {:<12} ({})", name, val, resolved);
+            }
+        }
+        IconActions::Get { role } => {
+            let roles = theme.icon_roles.clone().unwrap_or_else(|| theme::IconRoles {
+                default: "text".into(),
+                active: "primary".into(),
+                muted: "muted".into(),
+                disabled: "disabled".into(),
+                success: "success".into(),
+                warning: "warning".into(),
+                error: "danger".into(),
+                info: "info".into(),
+            });
+
+            let val = match role.to_lowercase().as_str() {
+                "default" => &roles.default,
+                "active" => &roles.active,
+                "muted" => &roles.muted,
+                "disabled" => &roles.disabled,
+                "success" => &roles.success,
+                "warning" => &roles.warning,
+                "error" | "danger" => &roles.error,
+                "info" => &roles.info,
+                _ => {
+                    eprintln!(
+                        "[!] Unknown icon role '{}'. Valid roles: default, active, muted, disabled, success, warning, error, info",
+                        role
+                    );
+                    std::process::exit(1);
+                }
+            };
+            let resolved = theme.resolve_icon_color(val);
+            println!("{}", resolved);
+        }
+        IconActions::Set { role, color } => {
+            if let Err(e) = theme.update_icon_role(&role, &color) {
+                eprintln!("[!] Error updating icon role: {}", e);
+                std::process::exit(1);
+            }
+
+            if let Err(e) = theme.save_to_file(&active_theme_path) {
+                eprintln!("[!] Error saving theme file: {}", e);
+                std::process::exit(1);
+            }
+
+            println!(
+                "[minimalctl] Updated icon role '{}' to '{}' in {}",
+                role,
+                color,
+                active_theme_path.display()
+            );
+
+            let _ = theme.backup_state(root);
+            if let Err(e) = theme.apply_runtime(root) {
+                eprintln!("[!] Failed to apply runtime theme transaction: {}", e);
+                std::process::exit(1);
+            }
+        }
+        IconActions::Reset => {
+            theme.icon_roles = Some(theme::IconRoles {
+                default: "text".into(),
+                active: "primary".into(),
+                muted: "muted".into(),
+                disabled: "disabled".into(),
+                success: "success".into(),
+                warning: "warning".into(),
+                error: "danger".into(),
+                info: "info".into(),
+            });
+
+            if let Err(e) = theme.save_to_file(&active_theme_path) {
+                eprintln!("[!] Error saving theme file: {}", e);
+                std::process::exit(1);
+            }
+
+            println!(
+                "[minimalctl] Reset icon roles to theme defaults in {}",
+                active_theme_path.display()
+            );
+
+            let _ = theme.backup_state(root);
+            if let Err(e) = theme.apply_runtime(root) {
+                eprintln!("[!] Failed to apply runtime theme transaction: {}", e);
+                std::process::exit(1);
+            }
+        }
     }
 }

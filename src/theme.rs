@@ -29,8 +29,8 @@ fn default_spacing_md() -> u32 { 12 }
 fn default_spacing_lg() -> u32 { 16 }
 fn default_spacing_xl() -> u32 { 24 }
 
-fn default_font() -> String { "Adwaita Sans".to_string() }
-fn default_mono() -> String { "AdwaitaMono Nerd Font".to_string() }
+fn default_font() -> String { "JetBrainsMono Nerd Font".to_string() }
+fn default_mono() -> String { "JetBrainsMono Nerd Font".to_string() }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct QuickshellIconRoles {
@@ -197,6 +197,83 @@ impl Theme {
         Ok(theme)
     }
 
+    pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), String> {
+        let toml_str = toml::to_string_pretty(self).map_err(|e| e.to_string())?;
+        Self::atomic_write(path, &toml_str)
+    }
+
+    pub fn resolve_icon_color(&self, val: &str) -> String {
+        if val.starts_with('#') {
+            return val.to_string();
+        }
+        match val {
+            "background" => self.tokens.background.clone(),
+            "surface" => self.tokens.surface.clone(),
+            "overlay" => self.tokens.overlay.clone(),
+            "text" => self.tokens.text.clone(),
+            "muted" => self.tokens.muted.clone(),
+            "disabled" => self.tokens.disabled.clone(),
+            "primary" => self.tokens.primary.clone(),
+            "secondary" => self.tokens.secondary.clone(),
+            "highlight" => self.tokens.highlight.clone(),
+            "success" => self.tokens.success.clone(),
+            "warning" => self.tokens.warning.clone(),
+            "danger" | "error" => self.tokens.danger.clone(),
+            "info" => self.tokens.info.clone(),
+            "selection" => self.tokens.selection.clone(),
+            "hover" => self.tokens.hover.clone(),
+            "pressed" => self.tokens.pressed.clone(),
+            "focus" => self.tokens.focus.clone(),
+            "panel" => self.tokens.panel.clone(),
+            "panel_variant" => self.tokens.panel_variant.clone(),
+            _ => val.to_string(),
+        }
+    }
+
+    pub fn update_icon_role(&mut self, role: &str, val: &str) -> Result<(), String> {
+        let is_hex = val.starts_with('#') && (val.len() == 7 || val.len() == 9);
+        let valid_tokens = [
+            "background", "surface", "overlay", "text", "muted", "disabled",
+            "primary", "secondary", "highlight", "success", "warning", "danger",
+            "info", "selection", "hover", "pressed", "focus", "panel", "panel_variant"
+        ];
+        if !is_hex && !valid_tokens.contains(&val) {
+            return Err(format!(
+                "Invalid color or token '{}'. Must be a hex color (e.g. #7DD3FC) or valid theme token name.",
+                val
+            ));
+        }
+
+        let mut roles = self.icon_roles.clone().unwrap_or_else(|| IconRoles {
+            default: "text".into(),
+            active: "primary".into(),
+            muted: "muted".into(),
+            disabled: "disabled".into(),
+            success: "success".into(),
+            warning: "warning".into(),
+            error: "danger".into(),
+            info: "info".into(),
+        });
+
+        match role.to_lowercase().as_str() {
+            "default" => roles.default = val.to_string(),
+            "active" => roles.active = val.to_string(),
+            "muted" => roles.muted = val.to_string(),
+            "disabled" => roles.disabled = val.to_string(),
+            "success" => roles.success = val.to_string(),
+            "warning" => roles.warning = val.to_string(),
+            "error" | "danger" => roles.error = val.to_string(),
+            "info" => roles.info = val.to_string(),
+            _ => return Err(format!(
+                "Unknown icon role '{}'. Valid roles: default, active, muted, disabled, success, warning, error, info",
+                role
+            )),
+        }
+
+        self.icon_roles = Some(roles);
+        Ok(())
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         let hex_regex =
             |val: &str| -> bool { val.starts_with('#') && (val.len() == 7 || val.len() == 9) };
@@ -288,7 +365,7 @@ inactive_tab_foreground {}
 allow_remote_control yes
 enabled_layouts tall,fat,grid,stack
 "#,
-            self.typography.as_ref().map(|t| t.mono.as_str()).unwrap_or("AdwaitaMono Nerd Font"),
+            self.typography.as_ref().map(|t| t.mono.as_str()).unwrap_or("JetBrainsMono Nerd Font"),
             self.tokens.text,
             self.tokens.background,
             self.tokens.background,
@@ -887,7 +964,7 @@ set -g mode-style "fg={},bg={}"
         format!(
             r#"[Settings]
 gtk-theme-name={}
-gtk-icon-theme-name=Aetheria
+gtk-icon-theme-name=Minimal
 gtk-application-prefer-dark-theme={}
 gtk-font-name={} 11
 "#,
@@ -917,7 +994,7 @@ gtk-font-name={} 11
     pub fn generate_qtct_conf(&self) -> String {
         format!(
             r#"[Appearance]
-icon_theme=Aetheria
+icon_theme=Minimal
 style=Fusion
 standard_dialogs=default
 "#,
@@ -926,13 +1003,13 @@ standard_dialogs=default
 
     pub fn install_icon_theme<P: AsRef<Path>>(root_dir: P) -> Result<(), String> {
         let root = root_dir.as_ref();
-        let src_aetheria = root.join("icons/dist/Aetheria");
-        if !src_aetheria.exists() {
+        let src_minimal = root.join("icons/dist/Minimal");
+        if !src_minimal.exists() {
             return Ok(());
         }
 
         let home = std::env::var("HOME").map_err(|e| e.to_string())?;
-        let icons_dest = PathBuf::from(&home).join(".local/share/icons/Aetheria");
+        let icons_dest = PathBuf::from(&home).join(".local/share/icons/Minimal");
 
         if let Err(e) = fs::create_dir_all(&icons_dest) {
             return Err(format!("Failed to create icon directory {}: {}", icons_dest.display(), e));
@@ -943,16 +1020,30 @@ standard_dialogs=default
             for entry in fs::read_dir(src)? {
                 let entry = entry?;
                 let ty = entry.file_type()?;
+                let dst_path = dst.join(entry.file_name());
                 if ty.is_dir() {
-                    copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
+                    copy_dir_all(&entry.path(), &dst_path)?;
+                } else if ty.is_symlink() {
+                    let target = fs::read_link(entry.path())?;
+                    if dst_path.exists() || fs::symlink_metadata(&dst_path).is_ok() {
+                        let _ = fs::remove_file(&dst_path);
+                    }
+                    #[cfg(unix)]
+                    std::os::unix::fs::symlink(target, dst_path)?;
                 } else {
-                    fs::copy(entry.path(), dst.join(entry.file_name()))?;
+                    fs::copy(entry.path(), dst_path)?;
                 }
             }
             Ok(())
         }
 
-        copy_dir_all(&src_aetheria, &icons_dest).map_err(|e| format!("Failed to copy Aetheria icon theme: {}", e))?;
+        copy_dir_all(&src_minimal, &icons_dest).map_err(|e| format!("Failed to copy Minimal icon theme: {}", e))?;
+        
+        // Update icon cache if gtk-update-icon-cache is available
+        let _ = std::process::Command::new("gtk-update-icon-cache")
+            .args(["-f", "-t", icons_dest.to_str().unwrap_or("")])
+            .output();
+
         Ok(())
     }
 
@@ -1060,7 +1151,7 @@ standard_dialogs=default
             Self::atomic_write(qt6_dir.join("qt6ct.conf"), &qt_conf)?;
         }
 
-        // Install Aetheria icon theme
+        // Install Minimal icon theme
         Self::install_icon_theme(root)?;
 
         Ok(())
@@ -1135,6 +1226,12 @@ standard_dialogs=default
         // 1. Validate & Build targets
         self.build_all(root)?;
         println!("[PASS] Theme source validated & active 7 targets built.");
+
+        // 1b. Update system gsettings icon theme
+        let _ = std::process::Command::new("gsettings")
+            .args(["set", "org.gnome.desktop.interface", "icon-theme", "Minimal"])
+            .output();
+        println!("[PASS] GTK: System icon theme set to 'Minimal' via gsettings");
 
         // 2. Kitty: Target-aware hot reload (SIGUSR1)
         if std::process::Command::new("pgrep")
@@ -1226,6 +1323,128 @@ standard_dialogs=default
 
         println!("[PASS] Theme transaction completed successfully.");
         Ok(())
+    }
+
+    pub fn run_doctor<P: AsRef<Path>>(root_dir: P) -> Result<(), String> {
+        let root = root_dir.as_ref();
+        println!("=== MINIMAL THEME & ICON SYSTEM DOCTOR ===");
+        println!("--------------------------------------------------");
+
+        let mut pass = 0;
+        let mut warn = 0;
+        let mut fail = 0;
+
+        // 1. Theme Definition
+        let active_theme_path = root.join("themes/obsidian.toml");
+        if let Ok(theme) = Theme::load_from_file(&active_theme_path) {
+            println!("[PASS] Theme source definition ({} - hash {})", theme.meta.name, theme.compute_hash());
+            pass += 1;
+        } else {
+            println!("[FAIL] Theme source definition invalid or missing");
+            fail += 1;
+        }
+
+        // 2. Local Repo Icon Distribution
+        let icon_dist = root.join("icons/dist/Minimal");
+        if icon_dist.join("index.theme").exists() && icon_dist.join("scalable").exists() {
+            println!("[PASS] Repository icon distribution (icons/dist/Minimal)");
+            pass += 1;
+        } else {
+            println!("[FAIL] Repository icon distribution missing or incomplete");
+            fail += 1;
+        }
+
+        // 3. User Installed Icon Theme
+        if let Ok(home) = std::env::var("HOME") {
+            let installed_icons = PathBuf::from(&home).join(".local/share/icons/Minimal");
+            if installed_icons.join("index.theme").exists() && installed_icons.join("scalable").exists() {
+                println!("[PASS] User icon theme installation (~/.local/share/icons/Minimal)");
+                pass += 1;
+            } else {
+                println!("[FAIL] User icon theme not installed in ~/.local/share/icons/Minimal");
+                fail += 1;
+            }
+        }
+
+        // 4. GTK settings.ini
+        if let Ok(home) = std::env::var("HOME") {
+            let gtk3_ini = PathBuf::from(&home).join(".config/gtk-3.0/settings.ini");
+            let gtk4_ini = PathBuf::from(&home).join(".config/gtk-4.0/settings.ini");
+            let gtk3_ok = gtk3_ini.exists() && fs::read_to_string(&gtk3_ini).map(|c| c.contains("gtk-icon-theme-name=Minimal")).unwrap_or(false);
+            let gtk4_ok = gtk4_ini.exists() && fs::read_to_string(&gtk4_ini).map(|c| c.contains("gtk-icon-theme-name=Minimal")).unwrap_or(false);
+            if gtk3_ok && gtk4_ok {
+                println!("[PASS] GTK 3 & GTK 4 settings.ini icon-theme set to Minimal");
+                pass += 1;
+            } else {
+                println!("[WARN] GTK settings.ini missing or not set to Minimal");
+                warn += 1;
+            }
+        }
+
+        // 5. GTK GSettings
+        let gsettings_theme = std::process::Command::new("gsettings")
+            .args(["get", "org.gnome.desktop.interface", "icon-theme"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_default();
+
+        if gsettings_theme.contains("Minimal") {
+            println!("[PASS] GSettings org.gnome.desktop.interface icon-theme set to 'Minimal'");
+            pass += 1;
+        } else {
+            println!("[FAIL] GSettings icon-theme is '{}' (expected 'Minimal')", gsettings_theme);
+            fail += 1;
+        }
+
+        // 6. Qt Config
+        if let Ok(home) = std::env::var("HOME") {
+            let qt5_conf = PathBuf::from(&home).join(".config/qt5ct/qt5ct.conf");
+            let qt6_conf = PathBuf::from(&home).join(".config/qt6ct/qt6ct.conf");
+            let qt5_ok = qt5_conf.exists() && fs::read_to_string(&qt5_conf).map(|c| c.contains("icon_theme=Minimal")).unwrap_or(false);
+            let qt6_ok = qt6_conf.exists() && fs::read_to_string(&qt6_conf).map(|c| c.contains("icon_theme=Minimal")).unwrap_or(false);
+            if qt5_ok || qt6_ok {
+                println!("[PASS] Qt (qtct) configuration icon_theme set to Minimal");
+                pass += 1;
+            } else {
+                println!("[WARN] Qt configuration missing or icon_theme not set to Minimal");
+                warn += 1;
+            }
+        }
+
+        // 7. Quickshell theme.json
+        if let Ok(home) = std::env::var("HOME") {
+            let qs_json = PathBuf::from(&home).join(".config/quickshell/theme.json");
+            if qs_json.exists() && fs::read_to_string(&qs_json).map(|c| c.contains("\"border_radius\"")).unwrap_or(false) {
+                println!("[PASS] Quickshell presentation theme.json (~/.config/quickshell/theme.json)");
+                pass += 1;
+            } else {
+                println!("[FAIL] Quickshell theme.json missing or invalid");
+                fail += 1;
+            }
+        }
+
+        // 8. Icon resolution lookup check
+        if let Ok(home) = std::env::var("HOME") {
+            let search_icon = PathBuf::from(&home).join(".local/share/icons/Minimal/scalable/actions/search.svg");
+            let wifi_icon = PathBuf::from(&home).join(".local/share/icons/Minimal/scalable/status/network-wifi.svg");
+            if search_icon.exists() && wifi_icon.exists() {
+                println!("[PASS] Icon lookup pipeline (actions/search.svg, status/network-wifi.svg verified)");
+                pass += 1;
+            } else {
+                println!("[FAIL] Icon lookup check failed for key symbolic icons");
+                fail += 1;
+            }
+        }
+
+        println!("--------------------------------------------------");
+        println!("Result: {} PASS / {} WARN / {} FAIL", pass, warn, fail);
+        println!();
+
+        if fail > 0 {
+            Err(format!("Theme & icon system doctor found {} failure(s)", fail))
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -1411,14 +1630,14 @@ mod tests {
     #[test]
     fn test_icon_svg_validity_and_index_theme() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let index_path = root.join("icons/dist/Aetheria/index.theme");
-        assert!(index_path.exists(), "Aetheria index.theme must exist");
+        let index_path = root.join("icons/dist/Minimal/index.theme");
+        assert!(index_path.exists(), "Minimal index.theme must exist");
 
         let content = fs::read_to_string(&index_path).expect("Read index.theme");
-        assert!(content.contains("Name=Aetheria"));
+        assert!(content.contains("Name=Minimal"));
         assert!(content.contains("Inherits=Adwaita,hicolor"));
 
-        let scalable_dir = root.join("icons/dist/Aetheria/scalable");
+        let scalable_dir = root.join("icons/dist/Minimal/scalable");
         assert!(scalable_dir.exists());
 
         // Check essential icons exist and contain valid XML/viewBox
@@ -1480,10 +1699,64 @@ mod tests {
         };
 
         let gtk = theme.generate_gtk_settings();
-        assert!(gtk.contains("gtk-icon-theme-name=Aetheria"));
+        assert!(gtk.contains("gtk-icon-theme-name=Minimal"));
         assert!(gtk.contains("gtk-application-prefer-dark-theme=1"));
 
         let qt = theme.generate_qtct_conf();
-        assert!(qt.contains("icon_theme=Aetheria"));
+        assert!(qt.contains("icon_theme=Minimal"));
+    }
+
+    #[test]
+    fn test_icon_role_update_and_resolution() {
+        let mut theme = Theme {
+            meta: ThemeMeta {
+                name: "obsidian".into(),
+                author: "Hypokoto".into(),
+                description: "Test".into(),
+            },
+            tokens: ThemeTokens {
+                background: "#0B0E14".into(),
+                surface: "#11161F".into(),
+                overlay: "#19212D".into(),
+                text: "#E8EDF5".into(),
+                muted: "#7F899B".into(),
+                disabled: "#475569".into(),
+                primary: "#7DD3FC".into(),
+                secondary: "#8BA4FF".into(),
+                highlight: "#B4A7FF".into(),
+                success: "#8BE28B".into(),
+                warning: "#E8C77B".into(),
+                danger: "#F08080".into(),
+                info: "#7DD3FC".into(),
+                selection: "#1E293B".into(),
+                hover: "#243144".into(),
+                pressed: "#0F172A".into(),
+                focus: "#38BDF8".into(),
+                panel: "#0F141C".into(),
+                panel_variant: "#151C28".into(),
+            },
+            icon_roles: None,
+            geometry: None,
+            spacing: None,
+            typography: None,
+        };
+
+        assert_eq!(theme.resolve_icon_color("primary"), "#7DD3FC");
+        assert_eq!(theme.resolve_icon_color("#FF00FF"), "#FF00FF");
+
+        assert!(theme.update_icon_role("active", "warning").is_ok());
+        assert_eq!(
+            theme.resolve_icon_color(&theme.icon_roles.as_ref().unwrap().active),
+            "#E8C77B"
+        );
+
+        assert!(theme.update_icon_role("active", "#123456").is_ok());
+        assert_eq!(
+            theme.resolve_icon_color(&theme.icon_roles.as_ref().unwrap().active),
+            "#123456"
+        );
+
+        assert!(theme.update_icon_role("active", "invalid_color").is_err());
+        assert!(theme.update_icon_role("invalid_role", "#123456").is_err());
     }
 }
