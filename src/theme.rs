@@ -2,35 +2,85 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-fn default_disabled() -> String { "#475569".to_string() }
-fn default_selection() -> String { "#1E293B".to_string() }
-fn default_hover() -> String { "#243144".to_string() }
-fn default_pressed() -> String { "#0F172A".to_string() }
-fn default_focus() -> String { "#38BDF8".to_string() }
-fn default_panel() -> String { "#0F141C".to_string() }
-fn default_panel_variant() -> String { "#151C28".to_string() }
+fn default_disabled() -> String {
+    "#475569".to_string()
+}
+fn default_selection() -> String {
+    "#1E293B".to_string()
+}
+fn default_hover() -> String {
+    "#243144".to_string()
+}
+fn default_pressed() -> String {
+    "#0F172A".to_string()
+}
+fn default_focus() -> String {
+    "#38BDF8".to_string()
+}
+fn default_panel() -> String {
+    "#0F141C".to_string()
+}
+fn default_panel_variant() -> String {
+    "#151C28".to_string()
+}
 
-fn default_icon_role_text() -> String { "text".to_string() }
-fn default_icon_role_primary() -> String { "primary".to_string() }
-fn default_icon_role_muted() -> String { "muted".to_string() }
-fn default_icon_role_disabled() -> String { "disabled".to_string() }
-fn default_icon_role_success() -> String { "success".to_string() }
-fn default_icon_role_warning() -> String { "warning".to_string() }
-fn default_icon_role_danger() -> String { "danger".to_string() }
-fn default_icon_role_info() -> String { "info".to_string() }
+fn default_icon_role_text() -> String {
+    "text".to_string()
+}
+fn default_icon_role_primary() -> String {
+    "primary".to_string()
+}
+fn default_icon_role_muted() -> String {
+    "muted".to_string()
+}
+fn default_icon_role_disabled() -> String {
+    "disabled".to_string()
+}
+fn default_icon_role_success() -> String {
+    "success".to_string()
+}
+fn default_icon_role_warning() -> String {
+    "warning".to_string()
+}
+fn default_icon_role_danger() -> String {
+    "danger".to_string()
+}
+fn default_icon_role_info() -> String {
+    "info".to_string()
+}
 
-fn default_radius_sm() -> u32 { 6 }
-fn default_radius_md() -> u32 { 12 }
-fn default_radius_lg() -> u32 { 18 }
+fn default_radius_sm() -> u32 {
+    6
+}
+fn default_radius_md() -> u32 {
+    12
+}
+fn default_radius_lg() -> u32 {
+    18
+}
 
-fn default_spacing_xs() -> u32 { 4 }
-fn default_spacing_sm() -> u32 { 8 }
-fn default_spacing_md() -> u32 { 12 }
-fn default_spacing_lg() -> u32 { 16 }
-fn default_spacing_xl() -> u32 { 24 }
+fn default_spacing_xs() -> u32 {
+    4
+}
+fn default_spacing_sm() -> u32 {
+    8
+}
+fn default_spacing_md() -> u32 {
+    12
+}
+fn default_spacing_lg() -> u32 {
+    16
+}
+fn default_spacing_xl() -> u32 {
+    24
+}
 
-fn default_font() -> String { "JetBrainsMono Nerd Font".to_string() }
-fn default_mono() -> String { "JetBrainsMono Nerd Font".to_string() }
+fn default_font() -> String {
+    "JetBrainsMono Nerd Font".to_string()
+}
+fn default_mono() -> String {
+    "JetBrainsMono Nerd Font".to_string()
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct QuickshellIconRoles {
@@ -233,9 +283,25 @@ impl Theme {
     pub fn update_icon_role(&mut self, role: &str, val: &str) -> Result<(), String> {
         let is_hex = val.starts_with('#') && (val.len() == 7 || val.len() == 9);
         let valid_tokens = [
-            "background", "surface", "overlay", "text", "muted", "disabled",
-            "primary", "secondary", "highlight", "success", "warning", "danger",
-            "info", "selection", "hover", "pressed", "focus", "panel", "panel_variant"
+            "background",
+            "surface",
+            "overlay",
+            "text",
+            "muted",
+            "disabled",
+            "primary",
+            "secondary",
+            "highlight",
+            "success",
+            "warning",
+            "danger",
+            "info",
+            "selection",
+            "hover",
+            "pressed",
+            "focus",
+            "panel",
+            "panel_variant",
         ];
         if !is_hex && !valid_tokens.contains(&val) {
             return Err(format!(
@@ -275,8 +341,11 @@ impl Theme {
     }
 
     pub fn validate(&self) -> Result<(), String> {
-        let hex_regex =
-            |val: &str| -> bool { val.starts_with('#') && (val.len() == 7 || val.len() == 9) };
+        let hex_regex = |val: &str| -> bool {
+            val.starts_with('#')
+                && (val.len() == 7 || val.len() == 9)
+                && val[1..].chars().all(|c| c.is_ascii_hexdigit())
+        };
 
         let tokens = [
             ("background", &self.tokens.background),
@@ -365,7 +434,10 @@ inactive_tab_foreground {}
 allow_remote_control yes
 enabled_layouts tall,fat,grid,stack
 "#,
-            self.typography.as_ref().map(|t| t.mono.as_str()).unwrap_or("JetBrainsMono Nerd Font"),
+            self.typography
+                .as_ref()
+                .map(|t| t.mono.as_str())
+                .unwrap_or("JetBrainsMono Nerd Font"),
             self.tokens.text,
             self.tokens.background,
             self.tokens.background,
@@ -907,22 +979,62 @@ set -g mode-style "fg={},bg={}"
 
     pub fn generate_quickshell_theme(&self) -> String {
         let icon_roles = QuickshellIconRoles {
-            default: self.icon_roles.as_ref().map(|i| i.default.clone()).unwrap_or_else(|| "text".to_string()),
-            active: self.icon_roles.as_ref().map(|i| i.active.clone()).unwrap_or_else(|| "primary".to_string()),
-            muted: self.icon_roles.as_ref().map(|i| i.muted.clone()).unwrap_or_else(|| "muted".to_string()),
-            disabled: self.icon_roles.as_ref().map(|i| i.disabled.clone()).unwrap_or_else(|| "disabled".to_string()),
-            success: self.icon_roles.as_ref().map(|i| i.success.clone()).unwrap_or_else(|| "success".to_string()),
-            warning: self.icon_roles.as_ref().map(|i| i.warning.clone()).unwrap_or_else(|| "warning".to_string()),
-            error: self.icon_roles.as_ref().map(|i| i.error.clone()).unwrap_or_else(|| "danger".to_string()),
-            info: self.icon_roles.as_ref().map(|i| i.info.clone()).unwrap_or_else(|| "info".to_string()),
+            default: self
+                .icon_roles
+                .as_ref()
+                .map(|i| i.default.clone())
+                .unwrap_or_else(|| "text".to_string()),
+            active: self
+                .icon_roles
+                .as_ref()
+                .map(|i| i.active.clone())
+                .unwrap_or_else(|| "primary".to_string()),
+            muted: self
+                .icon_roles
+                .as_ref()
+                .map(|i| i.muted.clone())
+                .unwrap_or_else(|| "muted".to_string()),
+            disabled: self
+                .icon_roles
+                .as_ref()
+                .map(|i| i.disabled.clone())
+                .unwrap_or_else(|| "disabled".to_string()),
+            success: self
+                .icon_roles
+                .as_ref()
+                .map(|i| i.success.clone())
+                .unwrap_or_else(|| "success".to_string()),
+            warning: self
+                .icon_roles
+                .as_ref()
+                .map(|i| i.warning.clone())
+                .unwrap_or_else(|| "warning".to_string()),
+            error: self
+                .icon_roles
+                .as_ref()
+                .map(|i| i.error.clone())
+                .unwrap_or_else(|| "danger".to_string()),
+            info: self
+                .icon_roles
+                .as_ref()
+                .map(|i| i.info.clone())
+                .unwrap_or_else(|| "info".to_string()),
         };
 
         let radius = self.geometry.as_ref().map(|g| g.radius_md).unwrap_or(12);
-        let font_fam = self.typography.as_ref().map(|t| t.font.clone()).unwrap_or_else(|| "Adwaita Sans".to_string());
+        let font_fam = self
+            .typography
+            .as_ref()
+            .map(|t| t.font.clone())
+            .unwrap_or_else(|| "Adwaita Sans".to_string());
 
         let config = QuickshellThemeConfig {
             name: self.meta.name.clone(),
-            mode: if self.meta.name.contains("light") { "light".to_string() } else { "dark".to_string() },
+            mode: if self.meta.name.contains("light") {
+                "light".to_string()
+            } else {
+                "dark".to_string()
+            },
             palette: QuickshellPalette {
                 background: self.tokens.background.clone(),
                 surface: self.tokens.surface.clone(),
@@ -958,9 +1070,21 @@ set -g mode-style "fg={},bg={}"
     }
 
     pub fn generate_gtk_settings(&self) -> String {
-        let is_dark = if self.meta.name.contains("light") { "0" } else { "1" };
-        let theme_name = if self.meta.name.contains("light") { "Adwaita" } else { "Adwaita-dark" };
-        let font = self.typography.as_ref().map(|t| t.font.as_str()).unwrap_or("Adwaita Sans");
+        let is_dark = if self.meta.name.contains("light") {
+            "0"
+        } else {
+            "1"
+        };
+        let theme_name = if self.meta.name.contains("light") {
+            "Adwaita"
+        } else {
+            "Adwaita-dark"
+        };
+        let font = self
+            .typography
+            .as_ref()
+            .map(|t| t.font.as_str())
+            .unwrap_or("Adwaita Sans");
         format!(
             r#"[Settings]
 gtk-theme-name={}
@@ -992,13 +1116,12 @@ gtk-font-name={} 11
     }
 
     pub fn generate_qtct_conf(&self) -> String {
-        format!(
-            r#"[Appearance]
+        r#"[Appearance]
 icon_theme=Minimal
 style=Fusion
 standard_dialogs=default
-"#,
-        )
+"#
+        .to_string()
     }
 
     pub fn install_icon_theme<P: AsRef<Path>>(root_dir: P) -> Result<(), String> {
@@ -1012,7 +1135,11 @@ standard_dialogs=default
         let icons_dest = PathBuf::from(&home).join(".local/share/icons/Minimal");
 
         if let Err(e) = fs::create_dir_all(&icons_dest) {
-            return Err(format!("Failed to create icon directory {}: {}", icons_dest.display(), e));
+            return Err(format!(
+                "Failed to create icon directory {}: {}",
+                icons_dest.display(),
+                e
+            ));
         }
 
         fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
@@ -1037,8 +1164,9 @@ standard_dialogs=default
             Ok(())
         }
 
-        copy_dir_all(&src_minimal, &icons_dest).map_err(|e| format!("Failed to copy Minimal icon theme: {}", e))?;
-        
+        copy_dir_all(&src_minimal, &icons_dest)
+            .map_err(|e| format!("Failed to copy Minimal icon theme: {}", e))?;
+
         // Update icon cache if gtk-update-icon-cache is available
         let _ = std::process::Command::new("gtk-update-icon-cache")
             .args(["-f", "-t", icons_dest.to_str().unwrap_or("")])
@@ -1067,8 +1195,9 @@ standard_dialogs=default
             use std::io::Write;
             let mut file = fs::File::create(&tmp_path)
                 .map_err(|e| format!("Failed to create temp file {}: {}", tmp_path.display(), e))?;
-            file.write_all(content.as_bytes())
-                .map_err(|e| format!("Failed to write to temp file {}: {}", tmp_path.display(), e))?;
+            file.write_all(content.as_bytes()).map_err(|e| {
+                format!("Failed to write to temp file {}: {}", tmp_path.display(), e)
+            })?;
             file.flush()
                 .map_err(|e| format!("Flush error on {}: {}", tmp_path.display(), e))?;
             file.sync_all()
@@ -1114,7 +1243,10 @@ standard_dialogs=default
         let root = root_dir.as_ref();
 
         Self::atomic_write(root.join("kitty/kitty.conf"), &self.generate_kitty_conf())?;
-        Self::atomic_write(root.join("starship/starship.toml"), &self.generate_starship_toml())?;
+        Self::atomic_write(
+            root.join("starship/starship.toml"),
+            &self.generate_starship_toml(),
+        )?;
         Self::atomic_write(root.join("btop/btop.theme"), &self.generate_btop_theme())?;
         Self::atomic_write(root.join("hypr/colors.conf"), &self.generate_hypr_colors())?;
         Self::atomic_write(root.join("tmux/tmux.conf"), &self.generate_tmux_conf())?;
@@ -1128,7 +1260,10 @@ standard_dialogs=default
 
         let nvim_theme_dir = root.join("nvim/lua/themes");
         if nvim_theme_dir.exists() {
-            Self::atomic_write(nvim_theme_dir.join("minimal.lua"), &self.generate_nvim_theme())?;
+            Self::atomic_write(
+                nvim_theme_dir.join("minimal.lua"),
+                &self.generate_nvim_theme(),
+            )?;
         }
 
         // GTK & Qt theme targets
@@ -1229,7 +1364,12 @@ standard_dialogs=default
 
         // 1b. Update system gsettings icon theme
         let _ = std::process::Command::new("gsettings")
-            .args(["set", "org.gnome.desktop.interface", "icon-theme", "Minimal"])
+            .args([
+                "set",
+                "org.gnome.desktop.interface",
+                "icon-theme",
+                "Minimal",
+            ])
             .output();
         println!("[PASS] GTK: System icon theme set to 'Minimal' via gsettings");
 
@@ -1337,7 +1477,11 @@ standard_dialogs=default
         // 1. Theme Definition
         let active_theme_path = root.join("themes/obsidian.toml");
         if let Ok(theme) = Theme::load_from_file(&active_theme_path) {
-            println!("[PASS] Theme source definition ({} - hash {})", theme.meta.name, theme.compute_hash());
+            println!(
+                "[PASS] Theme source definition ({} - hash {})",
+                theme.meta.name,
+                theme.compute_hash()
+            );
             pass += 1;
         } else {
             println!("[FAIL] Theme source definition invalid or missing");
@@ -1357,7 +1501,9 @@ standard_dialogs=default
         // 3. User Installed Icon Theme
         if let Ok(home) = std::env::var("HOME") {
             let installed_icons = PathBuf::from(&home).join(".local/share/icons/Minimal");
-            if installed_icons.join("index.theme").exists() && installed_icons.join("scalable").exists() {
+            if installed_icons.join("index.theme").exists()
+                && installed_icons.join("scalable").exists()
+            {
                 println!("[PASS] User icon theme installation (~/.local/share/icons/Minimal)");
                 pass += 1;
             } else {
@@ -1370,8 +1516,14 @@ standard_dialogs=default
         if let Ok(home) = std::env::var("HOME") {
             let gtk3_ini = PathBuf::from(&home).join(".config/gtk-3.0/settings.ini");
             let gtk4_ini = PathBuf::from(&home).join(".config/gtk-4.0/settings.ini");
-            let gtk3_ok = gtk3_ini.exists() && fs::read_to_string(&gtk3_ini).map(|c| c.contains("gtk-icon-theme-name=Minimal")).unwrap_or(false);
-            let gtk4_ok = gtk4_ini.exists() && fs::read_to_string(&gtk4_ini).map(|c| c.contains("gtk-icon-theme-name=Minimal")).unwrap_or(false);
+            let gtk3_ok = gtk3_ini.exists()
+                && fs::read_to_string(&gtk3_ini)
+                    .map(|c| c.contains("gtk-icon-theme-name=Minimal"))
+                    .unwrap_or(false);
+            let gtk4_ok = gtk4_ini.exists()
+                && fs::read_to_string(&gtk4_ini)
+                    .map(|c| c.contains("gtk-icon-theme-name=Minimal"))
+                    .unwrap_or(false);
             if gtk3_ok && gtk4_ok {
                 println!("[PASS] GTK 3 & GTK 4 settings.ini icon-theme set to Minimal");
                 pass += 1;
@@ -1392,7 +1544,10 @@ standard_dialogs=default
             println!("[PASS] GSettings org.gnome.desktop.interface icon-theme set to 'Minimal'");
             pass += 1;
         } else {
-            println!("[FAIL] GSettings icon-theme is '{}' (expected 'Minimal')", gsettings_theme);
+            println!(
+                "[FAIL] GSettings icon-theme is '{}' (expected 'Minimal')",
+                gsettings_theme
+            );
             fail += 1;
         }
 
@@ -1400,8 +1555,14 @@ standard_dialogs=default
         if let Ok(home) = std::env::var("HOME") {
             let qt5_conf = PathBuf::from(&home).join(".config/qt5ct/qt5ct.conf");
             let qt6_conf = PathBuf::from(&home).join(".config/qt6ct/qt6ct.conf");
-            let qt5_ok = qt5_conf.exists() && fs::read_to_string(&qt5_conf).map(|c| c.contains("icon_theme=Minimal")).unwrap_or(false);
-            let qt6_ok = qt6_conf.exists() && fs::read_to_string(&qt6_conf).map(|c| c.contains("icon_theme=Minimal")).unwrap_or(false);
+            let qt5_ok = qt5_conf.exists()
+                && fs::read_to_string(&qt5_conf)
+                    .map(|c| c.contains("icon_theme=Minimal"))
+                    .unwrap_or(false);
+            let qt6_ok = qt6_conf.exists()
+                && fs::read_to_string(&qt6_conf)
+                    .map(|c| c.contains("icon_theme=Minimal"))
+                    .unwrap_or(false);
             if qt5_ok || qt6_ok {
                 println!("[PASS] Qt (qtct) configuration icon_theme set to Minimal");
                 pass += 1;
@@ -1414,8 +1575,14 @@ standard_dialogs=default
         // 7. Quickshell theme.json
         if let Ok(home) = std::env::var("HOME") {
             let qs_json = PathBuf::from(&home).join(".config/quickshell/theme.json");
-            if qs_json.exists() && fs::read_to_string(&qs_json).map(|c| c.contains("\"border_radius\"")).unwrap_or(false) {
-                println!("[PASS] Quickshell presentation theme.json (~/.config/quickshell/theme.json)");
+            if qs_json.exists()
+                && fs::read_to_string(&qs_json)
+                    .map(|c| c.contains("\"border_radius\""))
+                    .unwrap_or(false)
+            {
+                println!(
+                    "[PASS] Quickshell presentation theme.json (~/.config/quickshell/theme.json)"
+                );
                 pass += 1;
             } else {
                 println!("[FAIL] Quickshell theme.json missing or invalid");
@@ -1425,8 +1592,10 @@ standard_dialogs=default
 
         // 8. Icon resolution lookup check
         if let Ok(home) = std::env::var("HOME") {
-            let search_icon = PathBuf::from(&home).join(".local/share/icons/Minimal/scalable/actions/search.svg");
-            let wifi_icon = PathBuf::from(&home).join(".local/share/icons/Minimal/scalable/status/network-wifi.svg");
+            let search_icon =
+                PathBuf::from(&home).join(".local/share/icons/Minimal/scalable/actions/search.svg");
+            let wifi_icon = PathBuf::from(&home)
+                .join(".local/share/icons/Minimal/scalable/status/network-wifi.svg");
             if search_icon.exists() && wifi_icon.exists() {
                 println!("[PASS] Icon lookup pipeline (actions/search.svg, status/network-wifi.svg verified)");
                 pass += 1;
@@ -1441,7 +1610,10 @@ standard_dialogs=default
         println!();
 
         if fail > 0 {
-            Err(format!("Theme & icon system doctor found {} failure(s)", fail))
+            Err(format!(
+                "Theme & icon system doctor found {} failure(s)",
+                fail
+            ))
         } else {
             Ok(())
         }

@@ -157,3 +157,54 @@ minimal/
 | `SUPER + ALT + Escape` | Lock screen (`hyprlock`) | Security |
 | `SUPER + SHIFT + G` | Toggle Game Mode (disable blur/animations) | Performance |
 | `SUPER + SHIFT + X` | Screen OCR text extractor to clipboard | Utilities |
+
+---
+
+## 🔒 Contributing — Security Checks Before Every Commit
+
+This repo enforces security scanning and code quality at the git hook level via **pre-commit** and **gitleaks**. All contributors must install these hooks before making their first commit.
+
+### One-time setup
+
+```bash
+# 1. Install pre-commit (Arch)
+sudo pacman -S python-pre-commit
+
+# or with pip
+pip install pre-commit
+
+# 2. Install the git hooks into this repo
+pre-commit install
+
+# 3. (Optional) Run against all files immediately to check your working tree
+pre-commit run --all-files
+```
+
+### What runs on every `git commit`
+
+| Hook | Purpose |
+|------|---------|
+| `trailing-whitespace` | Strips trailing whitespace |
+| `end-of-file-fixer` | Ensures files end with a newline |
+| `check-yaml` / `check-toml` | Validates config syntax |
+| `check-added-large-files` | Blocks accidental binary blobs |
+| `rustfmt` | Enforces Rust formatting |
+| `clippy` | Rust lints and correctness checks |
+| **`gitleaks`** | Scans staged changes for secrets, API keys, tokens |
+| `semgrep` | Static analysis for code security patterns |
+
+### Gitleaks
+
+[gitleaks](https://github.com/gitleaks/gitleaks) runs automatically via pre-commit. It will **block the commit** if it detects a secret. To run it manually:
+
+```bash
+# Scan the full repo (no git history)
+gitleaks detect --source . --no-git --config .gitleaks.toml
+
+# Scan git history
+gitleaks detect --config .gitleaks.toml
+```
+
+The [`.gitleaks.toml`](.gitleaks.toml) allowlist suppresses known false positives (SHA-256 content hashes in `graphify-out/`). If you hit a false positive on a new pattern, add it to the allowlist with a clear comment explaining what it is.
+
+> **Never bypass with `git commit --no-verify`** unless you have explicitly confirmed with the lead that the flagged content is a false positive and documented it in `.gitleaks.toml`.

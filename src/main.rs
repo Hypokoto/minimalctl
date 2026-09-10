@@ -23,7 +23,9 @@ fn find_repo_root() -> PathBuf {
     }
 
     // 2. Search upwards from binary executable location (handles ~/.local/bin/minimalctl)
-    if let Ok(exe_path) = std::env::var("HOME").map(|h| PathBuf::from(h).join(".local/bin/minimalctl")) {
+    if let Ok(exe_path) =
+        std::env::var("HOME").map(|h| PathBuf::from(h).join(".local/bin/minimalctl"))
+    {
         if let Ok(canonical_exe) = fs::canonicalize(&exe_path) {
             let mut curr = canonical_exe;
             while curr.pop() {
@@ -117,14 +119,9 @@ enum IconActions {
     /// List icon roles, token mappings, and resolved hex colors
     List,
     /// Get resolved color for a specific icon role (e.g. minimalctl icon get active)
-    Get {
-        role: String,
-    },
+    Get { role: String },
     /// Set color or token for an icon role and apply live (e.g. minimalctl icon set active #7DD3FC)
-    Set {
-        role: String,
-        color: String,
-    },
+    Set { role: String, color: String },
     /// Reset icon roles to theme default tokens
     Reset,
 }
@@ -250,12 +247,11 @@ fn main() {
                             ("info", &t_a.tokens.info, &t_b.tokens.info),
                         ];
                         for (token, val_a, val_b) in pairs.iter() {
-                            let status = if val_a == val_b {
-                                "MATCH"
-                            } else {
-                                "DIFFERENT"
-                            };
-                            println!(" - {:<12}: {:<10} -> {:<10} [{}]", token, val_a, val_b, status);
+                            let status = if val_a == val_b { "MATCH" } else { "DIFFERENT" };
+                            println!(
+                                " - {:<12}: {:<10} -> {:<10} [{}]",
+                                token, val_a, val_b, status
+                            );
                         }
                     }
                     (Err(e), _) | (_, Err(e)) => {
@@ -292,7 +288,7 @@ fn main() {
                 }
             }
             ThemeActions::Doctor => {
-                if let Err(_) = Theme::run_doctor(&root) {
+                if Theme::run_doctor(&root).is_err() {
                     std::process::exit(1);
                 }
             }
@@ -384,7 +380,9 @@ fn main() {
                         }
 
                         let quickshell_theme_file = std::env::var("HOME")
-                            .map(|h| std::path::PathBuf::from(h).join(".config/quickshell/theme.json"))
+                            .map(|h| {
+                                std::path::PathBuf::from(h).join(".config/quickshell/theme.json")
+                            })
                             .unwrap_or_else(|_| root.join("quickshell/theme.json"));
                         if quickshell_theme_file.exists() {
                             if let Ok(content) = fs::read_to_string(&quickshell_theme_file) {
@@ -392,7 +390,9 @@ fn main() {
                                     eprintln!("[!] DRIFT: ~/.config/quickshell/theme.json differs from compiled obsidian.toml output!");
                                     drift = true;
                                 } else {
-                                    println!(" - ~/.config/quickshell/theme.json: In sync with source.");
+                                    println!(
+                                        " - ~/.config/quickshell/theme.json: In sync with source."
+                                    );
                                 }
                             }
                         }
@@ -423,7 +423,15 @@ fn main() {
             ConfigActions::Verify => {
                 println!("=== REPOSITORY CONFIGURATION VERIFICATION ===");
                 let required_dirs = [
-                    "hypr", "quickshell", "kitty", "tmux", "zsh", "starship", "btop", "themes", "icons",
+                    "hypr",
+                    "quickshell",
+                    "kitty",
+                    "tmux",
+                    "zsh",
+                    "starship",
+                    "btop",
+                    "themes",
+                    "icons",
                 ];
                 let mut valid = true;
 
@@ -475,16 +483,19 @@ fn handle_icon_action(action: IconActions, root: &Path) {
     match action {
         IconActions::List => {
             println!("=== MINIMAL ICON COLOR ROLES ===");
-            let roles = theme.icon_roles.clone().unwrap_or_else(|| theme::IconRoles {
-                default: "text".into(),
-                active: "primary".into(),
-                muted: "muted".into(),
-                disabled: "disabled".into(),
-                success: "success".into(),
-                warning: "warning".into(),
-                error: "danger".into(),
-                info: "info".into(),
-            });
+            let roles = theme
+                .icon_roles
+                .clone()
+                .unwrap_or_else(|| theme::IconRoles {
+                    default: "text".into(),
+                    active: "primary".into(),
+                    muted: "muted".into(),
+                    disabled: "disabled".into(),
+                    success: "success".into(),
+                    warning: "warning".into(),
+                    error: "danger".into(),
+                    info: "info".into(),
+                });
 
             let items = [
                 ("default", &roles.default),
@@ -503,16 +514,19 @@ fn handle_icon_action(action: IconActions, root: &Path) {
             }
         }
         IconActions::Get { role } => {
-            let roles = theme.icon_roles.clone().unwrap_or_else(|| theme::IconRoles {
-                default: "text".into(),
-                active: "primary".into(),
-                muted: "muted".into(),
-                disabled: "disabled".into(),
-                success: "success".into(),
-                warning: "warning".into(),
-                error: "danger".into(),
-                info: "info".into(),
-            });
+            let roles = theme
+                .icon_roles
+                .clone()
+                .unwrap_or_else(|| theme::IconRoles {
+                    default: "text".into(),
+                    active: "primary".into(),
+                    muted: "muted".into(),
+                    disabled: "disabled".into(),
+                    success: "success".into(),
+                    warning: "warning".into(),
+                    error: "danger".into(),
+                    info: "info".into(),
+                });
 
             let val = match role.to_lowercase().as_str() {
                 "default" => &roles.default,
