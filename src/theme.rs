@@ -950,6 +950,20 @@ set -g pane-active-border-style "fg={}"
 set -g message-style "fg={},bg={},bold"
 setw -g clock-mode-colour "{}"
 set -g mode-style "fg={},bg={}"
+
+# --- TPM & PLUGINS ---
+set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+set -g @plugin 'tmux-plugins/tmux-continuum'
+
+set -g @continuum-restore 'off'
+set -g @continuum-save-interval '5'
+set -g @resurrect-capture-pane-contents 'on'
+set -g @resurrect-strategy-nvim 'session'
+
+bind -n M-f run-shell "tmux neww ~/.local/bin/tm"
+
+run '~/.tmux/plugins/tpm/tpm'
 "##,
             self.tokens.muted,
             self.tokens.surface,
