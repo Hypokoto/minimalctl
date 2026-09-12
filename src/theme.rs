@@ -958,6 +958,7 @@ set -g @plugin 'tmux-plugins/tmux-resurrect'
 set -g @resurrect-capture-pane-contents 'on'
 set -g @resurrect-strategy-nvim 'session'
 set -g @resurrect-save 'off'
+set -g @resurrect-restore 'off'
 
 bind -n M-f run-shell "tmux neww ~/.local/bin/tm"
 bind C-s run-shell "~/.local/bin/tm-save '' '#{{pane_current_path}}'"
