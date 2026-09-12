@@ -954,14 +954,15 @@ set -g mode-style "fg={},bg={}"
 # --- TPM & PLUGINS ---
 set -g @plugin 'tmux-plugins/tpm'
 set -g @plugin 'tmux-plugins/tmux-resurrect'
-set -g @plugin 'tmux-plugins/tmux-continuum'
 
-set -g @continuum-restore 'off'
-set -g @continuum-save-interval '5'
 set -g @resurrect-capture-pane-contents 'on'
 set -g @resurrect-strategy-nvim 'session'
+set -g @resurrect-save 'off'
 
 bind -n M-f run-shell "tmux neww ~/.local/bin/tm"
+bind C-s run-shell "~/.local/bin/tm-save"
+bind d command-prompt -p "Save session before detaching? (y/n):" "run-shell 'if [ \"%1\" = \"y\" ] || [ \"%1\" = \"Y\" ]; then ~/.local/bin/tm-save; fi; tmux detach-client'"
+bind q command-prompt -p "Save session before exiting? (y/n):" "run-shell 'if [ \"%1\" = \"y\" ] || [ \"%1\" = \"Y\" ]; then ~/.local/bin/tm-save; fi; tmux kill-session'"
 
 run '~/.tmux/plugins/tpm/tpm'
 "##,
