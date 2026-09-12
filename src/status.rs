@@ -66,8 +66,7 @@ impl SystemStatus {
         println!();
         println!("SESSION STATE");
         println!("  Hyprland             ● Running");
-        println!("  Waybar               ● Running");
-        println!("  Mako                 ● Running");
+        println!("  Quickshell           ● Running");
         println!("  Hypridle             ● Running");
         println!("  awww-daemon          ● Running");
         println!();
