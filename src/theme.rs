@@ -953,20 +953,9 @@ set -g mode-style "fg={},bg={}"
 
 # --- TPM & PLUGINS ---
 set -g @plugin 'tmux-plugins/tpm'
-set -g @plugin 'tmux-plugins/tmux-resurrect'
 
-set -g @resurrect-capture-pane-contents 'on'
-set -g @resurrect-strategy-nvim 'session'
-set -g @resurrect-save 'off'
-set -g @resurrect-restore 'off'
-set -g @resurrect-processes ':all:'
 
-bind -n M-f run-shell "tmux neww ~/.local/bin/tm"
-bind C-s run-shell "~/.local/bin/tm-save '' '#{{pane_current_path}}'"
-bind M-s command-prompt -p "Save as:" "run-shell '~/.local/bin/tm-save \"%1\" \"#{{pane_current_path}}\"'"
-bind C-r run-shell "tmux popup -E -w 50% -h 50% \"~/.local/bin/tm-restore '#{{pane_current_path}}'\""
-bind d command-prompt -p "Save session before detaching? (y/n):" "run-shell 'if [ \"%1\" = \"y\" ] || [ \"%1\" = \"Y\" ]; then ~/.local/bin/tm-save \"\" \"#{{pane_current_path}}\"; fi; tmux detach-client'"
-bind q command-prompt -p "Save session before exiting? (y/n):" "run-shell 'if [ \"%1\" = \"y\" ] || [ \"%1\" = \"Y\" ]; then ~/.local/bin/tm-save \"\" \"#{{pane_current_path}}\"; fi; tmux kill-session'"
+
 
 run '~/.tmux/plugins/tpm/tpm'
 "##,
