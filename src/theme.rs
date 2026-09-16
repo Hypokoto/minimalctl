@@ -393,6 +393,12 @@ confirm_os_window_close 0
 cursor_shape beam
 cursor_blink_interval 0
 
+# Latency & Performance Tuning
+repaint_delay 8
+input_delay 2
+sync_to_monitor no
+wayland_enable_ime no
+
 foreground            {}
 background            {}
 selection_foreground  {}
