@@ -42,12 +42,12 @@ minimalctl doctor
 ```
 
 `minimalctl theme apply` compiles 1 canonical source (`themes/*.toml`) into 7 active runtime targets live without logging out or killing session states:
-- `hypr/colors.conf` — Hyprland `$variable` definitions (reloaded live via `hyprctl`)
-- `kitty/kitty.conf` — Terminal palette & chrome (reloaded live via `SIGUSR1`)
-- `btop/btop.theme` — btop TUI color table
-- `starship/starship.toml` — Starship shell prompt (reloaded live on next prompt)
-- `tmux/tmux.conf` & `~/.tmux.conf` — Tmux status bar & pane borders (reloaded live via `tmux source-file` + `tmux refresh-client`)
-- `nvim/lua/themes/minimal.lua` — Neovim NvChad Base46 theme
+- `hyprland/hypr/colors.conf` — Hyprland `$variable` definitions (reloaded live via `hyprctl`)
+- `common/kitty/kitty.conf` — Terminal palette & chrome (reloaded live via `SIGUSR1`)
+- `common/btop/btop.theme` — btop TUI color table
+- `common/starship/starship.toml` — Starship shell prompt (reloaded live on next prompt)
+- `common/tmux/tmux.conf` & `~/.tmux.conf` — Tmux status bar & pane borders (reloaded live via `tmux source-file` + `tmux refresh-client`)
+- `common/nvim/lua/themes/minimal.lua` — Neovim NvChad Base46 theme
 - `~/.config/quickshell/theme.json` — Quickshell presentation layer (reloaded live via `quickshell ipc call minimal-shell reloadTheme`)
 
 ---
@@ -68,7 +68,7 @@ Minimal replaces legacy bar and menu daemons with a unified, lightweight Quicksh
 
 The Zsh shell environment is configured as a guarded, high-performance workspace:
 
-### 1. Defensive Alias Architecture (`zsh/aliases.zsh`)
+### 1. Defensive Alias Architecture (`common/zsh/aliases.zsh`)
 Every binary alias is wrapped in a `command -v <tool> >/dev/null 2>&1` check to guarantee that the shell never breaks if a package is uninstalled:
 - **Listing**: `ls`, `ll`, `la`, `l`, `lt`, `llt` → `eza` (with git & icon support)
 - **File Viewing**: `cat`, `batp` → `bat` (syntax highlighting pager)
@@ -78,7 +78,7 @@ Every binary alias is wrapped in a `command -v <tool> >/dev/null 2>&1` check to 
 - **Safe Deletion**: `rm`, `tp`, `tl`, `tr` → `trash-cli` / `trash-put` (with `rmf` for raw `/bin/rm -iv`)
 - **Navigation & Reloader**: `..`, `...`, `....`, `-`, `reload`, `ezsh`, `ealias`
 
-### 2. Rust Security & Networking Layer (`zsh/sec.zsh`)
+### 2. Rust Security & Networking Layer (`common/zsh/sec.zsh`)
 Dedicated security and networking aliases:
 - **Recon & Fuzzing**: `rustscan` (fast Nmap hand-off) and `feroxbuster` (web content discovery).
 - **Monitoring & Discovery**: `sniffnet` (TUI traffic monitor), `bandwhich`, `trippy` (traceroute), and `netscanner` (ARP LAN discovery).
