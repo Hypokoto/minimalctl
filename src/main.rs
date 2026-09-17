@@ -319,49 +319,49 @@ fn main() {
                     Ok(theme) => {
                         println!(" - themes/obsidian.toml: Valid TOML, all hex tokens verified.");
 
-                        if let Ok(content) = fs::read_to_string(root.join("kitty/kitty.conf")) {
+                        if let Ok(content) = fs::read_to_string(root.join("common/kitty/kitty.conf")) {
                             if content != theme.generate_kitty_conf() {
-                                eprintln!("[!] DRIFT: kitty/kitty.conf differs from compiled obsidian.toml output!");
+                                eprintln!("[!] DRIFT: common/kitty/kitty.conf differs from compiled obsidian.toml output!");
                                 drift = true;
                             } else {
-                                println!(" - kitty/kitty.conf: In sync with source.");
+                                println!(" - common/kitty/kitty.conf: In sync with source.");
                             }
                         }
 
-                        if let Ok(content) = fs::read_to_string(root.join("starship/starship.toml"))
+                        if let Ok(content) = fs::read_to_string(root.join("common/starship/starship.toml"))
                         {
                             if content != theme.generate_starship_toml() {
-                                eprintln!("[!] DRIFT: starship/starship.toml differs from compiled obsidian.toml output!");
+                                eprintln!("[!] DRIFT: common/starship/starship.toml differs from compiled obsidian.toml output!");
                                 drift = true;
                             } else {
-                                println!(" - starship/starship.toml: In sync with source.");
+                                println!(" - common/starship/starship.toml: In sync with source.");
                             }
                         }
 
-                        if let Ok(content) = fs::read_to_string(root.join("btop/btop.theme")) {
+                        if let Ok(content) = fs::read_to_string(root.join("common/btop/btop.theme")) {
                             if content != theme.generate_btop_theme() {
-                                eprintln!("[!] DRIFT: btop/btop.theme differs from compiled obsidian.toml output!");
+                                eprintln!("[!] DRIFT: common/btop/btop.theme differs from compiled obsidian.toml output!");
                                 drift = true;
                             } else {
-                                println!(" - btop/btop.theme: In sync with source.");
+                                println!(" - common/btop/btop.theme: In sync with source.");
                             }
                         }
 
-                        if let Ok(content) = fs::read_to_string(root.join("hypr/colors.conf")) {
+                        if let Ok(content) = fs::read_to_string(root.join("hyprland/hypr/colors.conf")) {
                             if content != theme.generate_hypr_colors() {
-                                eprintln!("[!] DRIFT: hypr/colors.conf differs from compiled obsidian.toml output!");
+                                eprintln!("[!] DRIFT: hyprland/hypr/colors.conf differs from compiled obsidian.toml output!");
                                 drift = true;
                             } else {
-                                println!(" - hypr/colors.conf: In sync with source.");
+                                println!(" - hyprland/hypr/colors.conf: In sync with source.");
                             }
                         }
 
-                        if let Ok(content) = fs::read_to_string(root.join("tmux/tmux.conf")) {
+                        if let Ok(content) = fs::read_to_string(root.join("common/tmux/tmux.conf")) {
                             if content != theme.generate_tmux_conf() {
-                                eprintln!("[!] DRIFT: tmux/tmux.conf differs from compiled obsidian.toml output!");
+                                eprintln!("[!] DRIFT: common/tmux/tmux.conf differs from compiled obsidian.toml output!");
                                 drift = true;
                             } else {
-                                println!(" - tmux/tmux.conf: In sync with source.");
+                                println!(" - common/tmux/tmux.conf: In sync with source.");
                             }
                         }
 
@@ -383,7 +383,7 @@ fn main() {
                             .map(|h| {
                                 std::path::PathBuf::from(h).join(".config/quickshell/theme.json")
                             })
-                            .unwrap_or_else(|_| root.join("quickshell/theme.json"));
+                            .unwrap_or_else(|_| root.join("hyprland/quickshell/theme.json"));
                         if quickshell_theme_file.exists() {
                             if let Ok(content) = fs::read_to_string(&quickshell_theme_file) {
                                 if content != theme.generate_quickshell_theme() {
@@ -445,7 +445,7 @@ fn main() {
                     }
                 }
 
-                let keybinds_file = root.join("hypr/keybinds.lua");
+                let keybinds_file = root.join("hyprland/hypr/keybinds.lua");
                 if keybinds_file.exists() {
                     if let Ok(content) = fs::read_to_string(&keybinds_file) {
                         if content.contains("hl.bind") {
@@ -455,7 +455,7 @@ fn main() {
                         }
                     }
                 } else {
-                    eprintln!(" [FAIL] Missing hypr/keybinds.lua");
+                    eprintln!(" [FAIL] Missing hyprland/hypr/keybinds.lua");
                     valid = false;
                 }
 

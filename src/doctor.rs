@@ -97,27 +97,27 @@ impl DoctorReport {
         // 7. Theme Drift Check
         let mut drift = false;
         if let Ok(theme) = Theme::load_from_file("themes/obsidian.toml") {
-            if let Ok(content) = fs::read_to_string("kitty/kitty.conf") {
+            if let Ok(content) = fs::read_to_string("common/kitty/kitty.conf") {
                 if content != theme.generate_kitty_conf() {
                     drift = true;
                 }
             }
-            if let Ok(content) = fs::read_to_string("starship/starship.toml") {
+            if let Ok(content) = fs::read_to_string("common/starship/starship.toml") {
                 if content != theme.generate_starship_toml() {
                     drift = true;
                 }
             }
-            if let Ok(content) = fs::read_to_string("btop/btop.theme") {
+            if let Ok(content) = fs::read_to_string("common/btop/btop.theme") {
                 if content != theme.generate_btop_theme() {
                     drift = true;
                 }
             }
-            if let Ok(content) = fs::read_to_string("hypr/colors.conf") {
+            if let Ok(content) = fs::read_to_string("hyprland/hypr/colors.conf") {
                 if content != theme.generate_hypr_colors() {
                     drift = true;
                 }
             }
-            if let Ok(content) = fs::read_to_string("tmux/tmux.conf") {
+            if let Ok(content) = fs::read_to_string("common/tmux/tmux.conf") {
                 if content != theme.generate_tmux_conf() {
                     drift = true;
                 }

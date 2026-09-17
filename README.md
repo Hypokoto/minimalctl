@@ -22,7 +22,7 @@ cd ~/minimal
 ```
 
 - **`install.sh`**: Multi-distro package installer with distro detection (`pacman`/`apt`/`dnf`/`brew`). On Arch Linux (primary target), installs system binaries, fonts, services, and toolchains via `pacman` + `yay` (AUR). On other distros, skips system package installation but still deploys dotfiles via `deploy.sh`.
-- **`deploy.sh`**: Idempotent deployment pipeline for user dotfiles. Performs binary presence verification, palette target compilation (`minimalctl theme apply obsidian`), atomic symlinking, NvChad custom overlaying, and font cache refreshes (`fc-cache -fv`). Logged to `/tmp/minimal-deploy.log`.
+- **`deploy.sh`**: Idempotent deployment pipeline for user dotfiles. Performs binary presence verification, palette target compilation (`minimalctl theme apply obsidian`), atomic symlinking, NvChad custom overlaying, and font cache refreshes (`fc-cache -fv`). Logged to `~/.local/state/minimal-deploy.log`.
 
 ---
 
