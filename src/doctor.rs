@@ -122,8 +122,8 @@ impl DoctorReport {
                     drift = true;
                 }
             }
-            if Path::new("nvim/lua/themes/minimal.lua").exists() {
-                if let Ok(content) = fs::read_to_string("nvim/lua/themes/minimal.lua") {
+            if Path::new("common/nvim/lua/themes/minimal.lua").exists() {
+                if let Ok(content) = fs::read_to_string("common/nvim/lua/themes/minimal.lua") {
                     if content != theme.generate_nvim_theme() {
                         drift = true;
                     }

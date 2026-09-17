@@ -1272,7 +1272,7 @@ standard_dialogs=default
         };
         Self::atomic_write(quickshell_target, &self.generate_quickshell_theme())?;
 
-        let nvim_theme_dir = root.join("nvim/lua/themes");
+        let nvim_theme_dir = root.join("common/nvim/lua/themes");
         if nvim_theme_dir.exists() {
             Self::atomic_write(
                 nvim_theme_dir.join("minimal.lua"),
@@ -1330,7 +1330,7 @@ standard_dialogs=default
             }
         }
 
-        let nvim_src = root.join("nvim/lua/themes/minimal.lua");
+        let nvim_src = root.join("common/nvim/lua/themes/minimal.lua");
         if nvim_src.exists() {
             let _ = fs::copy(&nvim_src, backup_dir.join("nvim_lua_themes_minimal.lua"));
         }
@@ -1351,7 +1351,7 @@ standard_dialogs=default
             ("btop_btop.theme", "common/btop/btop.theme"),
             ("hypr_colors.conf", "hyprland/hypr/colors.conf"),
             ("tmux_tmux.conf", "common/tmux/tmux.conf"),
-            ("nvim_lua_themes_minimal.lua", "nvim/lua/themes/minimal.lua"),
+            ("nvim_lua_themes_minimal.lua", "common/nvim/lua/themes/minimal.lua"),
         ];
 
         for (bak_name, target_rel) in files.iter() {

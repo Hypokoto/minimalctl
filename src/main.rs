@@ -365,15 +365,15 @@ fn main() {
                             }
                         }
 
-                        let nvim_theme_file = root.join("nvim/lua/themes/minimal.lua");
+                        let nvim_theme_file = root.join("common/nvim/lua/themes/minimal.lua");
                         if nvim_theme_file.exists() {
                             if let Ok(content) = fs::read_to_string(&nvim_theme_file) {
                                 if content != theme.generate_nvim_theme() {
-                                    eprintln!("[!] DRIFT: nvim/lua/themes/minimal.lua differs from compiled obsidian.toml output!");
+                                    eprintln!("[!] DRIFT: common/nvim/lua/themes/minimal.lua differs from compiled obsidian.toml output!");
                                     drift = true;
                                 } else {
                                     println!(
-                                        " - nvim/lua/themes/minimal.lua: In sync with source."
+                                        " - common/nvim/lua/themes/minimal.lua: In sync with source."
                                     );
                                 }
                             }
