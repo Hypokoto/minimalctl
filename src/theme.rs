@@ -923,7 +923,7 @@ set -g mouse on
 
 set -g default-terminal "tmux-256color"
 set -as terminal-features ",xterm-256color:RGB"
-set -as terminal-features ",xterm-kitty:RGB"
+set -as terminal-features ",foot:RGB"
 set -as terminal-features ",alacritty:RGB"
 set -ag terminal-overrides ",xterm-256color:Tc"
 
