@@ -165,7 +165,6 @@ impl AuditReport {
             "labwc/scripts/osd-volume.sh",
             "labwc/scripts/powermenu.sh",
             "labwc/scripts/screen-record.sh",
-            "swayidle/config",
         ];
 
         #[cfg(unix)]
