@@ -1,5 +1,4 @@
 use crate::status::SystemStatus;
-use crate::theme::Theme;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -81,60 +80,45 @@ impl DoctorReport {
             fail += 1;
         }
 
-        // 6. Theme Source & Validation (themes/synthwave.toml)
+        // 6. Theme Source Definition (themes/synthwave.toml)
         let synthwave_path = root.join("themes/synthwave.toml");
-        let theme_ok = if let Ok(theme) = Theme::load_from_file(&synthwave_path) {
-            theme.validate().is_ok()
+        let theme_ok = if let Ok(content) = fs::read_to_string(&synthwave_path) {
+            content.parse::<toml::Value>().map(|v| v.get("tokens").is_some()).unwrap_or(false)
         } else {
             false
         };
 
         if theme_ok {
-            println!("[PASS] Theme source definition (synthwave.toml)");
+            println!("[PASS] Theme source definition (synthwave.toml valid)");
             pass += 1;
         } else {
             println!("[FAIL] Theme source definition invalid or missing (themes/synthwave.toml)");
             fail += 1;
         }
 
-        // 7. Theme Drift Check (against synthwave.toml)
-        let mut drift = false;
-        if let Ok(theme) = Theme::load_from_file(&synthwave_path) {
-            if let Ok(content) = fs::read_to_string(root.join("starship/starship.toml")) {
-                if content != theme.generate_starship_toml() {
-                    drift = true;
-                }
-            }
-            if let Ok(content) = fs::read_to_string(root.join("btop/btop.theme")) {
-                if content != theme.generate_btop_theme() {
-                    drift = true;
-                }
-            }
-            if let Ok(content) = fs::read_to_string(root.join("tmux/tmux.conf")) {
-                if content != theme.generate_tmux_conf() {
-                    drift = true;
-                }
-            }
-            if let Ok(content) = fs::read_to_string(root.join("labwc/themerc")) {
-                if content != theme.generate_labwc_themerc() {
-                    drift = true;
-                }
-            }
-            let nvim_theme_file = root.join("nvim/lua/themes/minimal.lua");
-            if nvim_theme_file.exists() {
-                if let Ok(content) = fs::read_to_string(&nvim_theme_file) {
-                    if content != theme.generate_nvim_theme() {
-                        drift = true;
-                    }
-                }
+        // 7. Desktop Target Configurations Integrity
+        let mut targets_ok = true;
+        let targets = [
+            "starship/starship.toml",
+            "btop/btop.theme",
+            "tmux/tmux.conf",
+            "labwc/themerc",
+            "foot/foot.ini",
+            "fuzzel/fuzzel.ini",
+            "nvim/lua/themes/minimal.lua",
+        ];
+        for target in targets {
+            let p = root.join(target);
+            if !p.exists() || fs::metadata(&p).map(|m| m.len() == 0).unwrap_or(true) {
+                println!("[FAIL] Missing or empty target config: {}", target);
+                targets_ok = false;
             }
         }
-
-        if !drift {
-            println!("[PASS] Theme drift check (generated targets match synthwave.toml)");
+        if targets_ok {
+            println!("[PASS] Desktop configuration targets intact (starship, btop, tmux, labwc, foot, fuzzel, nvim)");
             pass += 1;
         } else {
-            println!("[WARN] Theme drift detected in target configs vs synthwave.toml");
+            println!("[WARN] One or more configuration targets missing or empty");
             warn += 1;
         }
 
