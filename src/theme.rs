@@ -992,9 +992,17 @@ set -g mode-style "fg={},bg={}"
 
 # --- TPM & PLUGINS ---
 set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+set -g @plugin 'tmux-plugins/tmux-continuum'
 
+set -g @continuum-save-interval '0'
+set -g @resurrect-save 'off'
+set -g @resurrect-restore 'off'
 
+bind C-s command-prompt -p "Save as (leave empty for default):" "run-shell 'if [ -z \"%1\" ]; then ~/.local/bin/tm-save; else ~/.local/bin/tm-save \"%1\"; fi'"
+bind C-r popup -E -w 50% -h 50% "~/.local/bin/tm-restore"
 
+bind d command-prompt -p "Save session before detaching? (y/n):" "run-shell 'if [ \"%1\" = \"y\" ]; then ~/.local/bin/tm-save; fi; tmux detach-client'"
 
 run '~/.tmux/plugins/tpm/tpm'
 "##,
