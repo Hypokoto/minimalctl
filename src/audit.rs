@@ -158,6 +158,7 @@ impl AuditReport {
             "deploy.sh",
             "install.sh",
             "tty-init.sh",
+            "scripts/battery-monitor.sh",
             "labwc/scripts/dpms.sh",
             "labwc/scripts/nightlight.sh",
             "labwc/scripts/ocr.sh",
