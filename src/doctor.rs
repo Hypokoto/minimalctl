@@ -2,6 +2,7 @@ use crate::status::SystemStatus;
 use crate::theme::Theme;
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 
 #[allow(dead_code)]
 pub struct DoctorReport {
@@ -11,7 +12,8 @@ pub struct DoctorReport {
 }
 
 impl DoctorReport {
-    pub fn run() -> Self {
+    pub fn run<P: AsRef<Path>>(root_dir: P) -> Self {
+        let root = root_dir.as_ref();
         println!("MINIMAL DOCTOR — OPERATIONAL DIAGNOSTIC SUITE");
         println!("--------------------------------------------------");
 
@@ -22,7 +24,7 @@ impl DoctorReport {
         let status = SystemStatus::collect();
 
         // 1. Package Provenance
-        if Path::new("packages/core.txt").exists() && Path::new("packages/cli.txt").exists() {
+        if root.join("packages/core.txt").exists() && root.join("packages/cli.txt").exists() {
             println!("[PASS] Package provenance policy");
             pass += 1;
         } else {
@@ -31,7 +33,7 @@ impl DoctorReport {
         }
 
         // 2. Security Invariants
-        if Path::new("scripts/audit-security.sh").exists() {
+        if root.join("scripts/audit-security.sh").exists() {
             println!("[PASS] Security static invariants");
             pass += 1;
         } else {
@@ -43,7 +45,7 @@ impl DoctorReport {
         let banned_procs = ["conky", "nm-applet", "nwg-drawer", "hyprlauncher"];
         let mut found_banned = false;
         for proc in banned_procs {
-            if std::process::Command::new("pgrep")
+            if Command::new("pgrep")
                 .arg("-x")
                 .arg(proc)
                 .output()
@@ -79,93 +81,87 @@ impl DoctorReport {
             fail += 1;
         }
 
-        // 6. Theme Source & Validation
-        let theme_ok = if let Ok(theme) = Theme::load_from_file("themes/obsidian.toml") {
+        // 6. Theme Source & Validation (themes/synthwave.toml)
+        let synthwave_path = root.join("themes/synthwave.toml");
+        let theme_ok = if let Ok(theme) = Theme::load_from_file(&synthwave_path) {
             theme.validate().is_ok()
         } else {
             false
         };
 
         if theme_ok {
-            println!("[PASS] Theme source definition (obsidian.toml)");
+            println!("[PASS] Theme source definition (synthwave.toml)");
             pass += 1;
         } else {
-            println!("[FAIL] Theme source definition invalid or missing");
+            println!("[FAIL] Theme source definition invalid or missing (themes/synthwave.toml)");
             fail += 1;
         }
 
-        // 7. Theme Drift Check
+        // 7. Theme Drift Check (against synthwave.toml)
         let mut drift = false;
-        if let Ok(theme) = Theme::load_from_file("themes/obsidian.toml") {
-            if let Ok(content) = fs::read_to_string("kitty/kitty.conf") {
-                if content != theme.generate_kitty_conf() {
-                    drift = true;
-                }
-            }
-            if let Ok(content) = fs::read_to_string("starship/starship.toml") {
+        if let Ok(theme) = Theme::load_from_file(&synthwave_path) {
+            if let Ok(content) = fs::read_to_string(root.join("starship/starship.toml")) {
                 if content != theme.generate_starship_toml() {
                     drift = true;
                 }
             }
-            if let Ok(content) = fs::read_to_string("btop/btop.theme") {
+            if let Ok(content) = fs::read_to_string(root.join("btop/btop.theme")) {
                 if content != theme.generate_btop_theme() {
                     drift = true;
                 }
             }
-            if let Ok(content) = fs::read_to_string("labwc/hypr/colors.conf") {
-                if content != theme.generate_hypr_colors() {
-                    drift = true;
-                }
-            }
-            if let Ok(content) = fs::read_to_string("tmux/tmux.conf") {
+            if let Ok(content) = fs::read_to_string(root.join("tmux/tmux.conf")) {
                 if content != theme.generate_tmux_conf() {
                     drift = true;
                 }
             }
-            if Path::new("nvim/lua/themes/minimal.lua").exists() {
-                if let Ok(content) = fs::read_to_string("nvim/lua/themes/minimal.lua") {
-                    if content != theme.generate_nvim_theme() {
-                        drift = true;
-                    }
+            if let Ok(content) = fs::read_to_string(root.join("labwc/themerc")) {
+                if content != theme.generate_labwc_themerc() {
+                    drift = true;
                 }
             }
-            if let Ok(home) = std::env::var("HOME") {
-                let qs_theme = std::path::PathBuf::from(home).join(".config/quickshell/theme.json");
-                if qs_theme.exists() {
-                    if let Ok(content) = fs::read_to_string(&qs_theme) {
-                        if content != theme.generate_quickshell_theme() {
-                            drift = true;
-                        }
+            let nvim_theme_file = root.join("nvim/lua/themes/minimal.lua");
+            if nvim_theme_file.exists() {
+                if let Ok(content) = fs::read_to_string(&nvim_theme_file) {
+                    if content != theme.generate_nvim_theme() {
+                        drift = true;
                     }
                 }
             }
         }
 
         if !drift {
-            println!("[PASS] Theme drift check (generated targets match source)");
+            println!("[PASS] Theme drift check (generated targets match synthwave.toml)");
             pass += 1;
         } else {
-            println!("[WARN] Theme drift detected in target configs");
+            println!("[WARN] Theme drift detected in target configs vs synthwave.toml");
             warn += 1;
         }
 
-        // 8. Quickshell Environment Check
-        let qs_installed = std::process::Command::new("command")
-            .args(["-v", "quickshell"])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
-            || Path::new("/usr/bin/quickshell").exists();
+        // 8. Wayland Desktop Stack Availability (labwc, foot, fuzzel, mako)
+        let mut wayland_ok = true;
+        for binary in &["labwc", "foot", "fuzzel", "mako"] {
+            let available = Command::new("command")
+                .args(["-v", binary])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+                || Path::new(&format!("/usr/bin/{}", binary)).exists()
+                || Path::new(&format!("/usr/local/bin/{}", binary)).exists();
 
-        if qs_installed {
-            println!("[PASS] Quickshell binary available");
+            if !available {
+                println!("[WARN] Wayland component binary not found in PATH: {}", binary);
+                wayland_ok = false;
+            }
+        }
+        if wayland_ok {
+            println!("[PASS] Wayland desktop stack binaries available (labwc, foot, fuzzel, mako)");
             pass += 1;
         } else {
-            println!("[WARN] Quickshell binary not found in PATH");
             warn += 1;
         }
 
-        // 8. Firewall Status
+        // 9. Firewall Status
         if status.firewall_active {
             println!("[PASS] Firewall active (nftables)");
             pass += 1;

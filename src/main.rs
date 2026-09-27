@@ -1,7 +1,9 @@
+mod audit;
 mod doctor;
 mod status;
 mod theme;
 
+use audit::AuditReport;
 use clap::{Parser, Subcommand};
 use doctor::DoctorReport;
 use status::SystemStatus;
@@ -13,7 +15,7 @@ fn find_repo_root() -> PathBuf {
     // 1. Search upwards from current working directory
     if let Ok(mut curr) = std::env::current_dir() {
         loop {
-            if curr.join("quickshell").exists() && curr.join("themes").exists() {
+            if curr.join("labwc").exists() && curr.join("themes").exists() {
                 return curr;
             }
             if !curr.pop() {
@@ -29,7 +31,7 @@ fn find_repo_root() -> PathBuf {
         if let Ok(canonical_exe) = fs::canonicalize(&exe_path) {
             let mut curr = canonical_exe;
             while curr.pop() {
-                if curr.join("quickshell").exists() && curr.join("themes").exists() {
+                if curr.join("labwc").exists() && curr.join("themes").exists() {
                     return curr;
                 }
             }
@@ -79,7 +81,7 @@ fn resolve_theme_path<P: AsRef<Path>>(input: P, root: &Path) -> PathBuf {
 
 #[derive(Parser)]
 #[command(name = "minimalctl")]
-#[command(about = "Native control plane and theme compiler for Minimal OS Shell", long_about = None)]
+#[command(about = "Native diagnostic, audit, and verification control plane for Minimal OS", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -91,15 +93,12 @@ enum Commands {
     Status,
     /// Run single-pass operational diagnostic suite across desktop invariants
     Doctor,
-    /// Theme management, target configuration compilation, and drift verification
+    /// Run security, syntax, and permission audit suite
+    Audit,
+    /// Theme verification and static target compilation (no runtime applying)
     Theme {
         #[command(subcommand)]
         action: ThemeActions,
-    },
-    /// Icon theme color inspection and dynamic role modification
-    Icon {
-        #[command(subcommand)]
-        action: IconActions,
     },
     /// Repository configuration verification suite
     Config {
@@ -114,23 +113,11 @@ enum ConfigActions {
     Verify,
 }
 
-#[derive(Subcommand, Clone)]
-enum IconActions {
-    /// List icon roles, token mappings, and resolved hex colors
-    List,
-    /// Get resolved color for a specific icon role (e.g. minimalctl icon get active)
-    Get { role: String },
-    /// Set color or token for an icon role and apply live (e.g. minimalctl icon set active #7DD3FC)
-    Set { role: String, color: String },
-    /// Reset icon roles to theme default tokens
-    Reset,
-}
-
 #[derive(Subcommand)]
 enum ThemeActions {
     /// Compile target configurations from specified theme TOML file
     Build {
-        #[arg(default_value = "themes/obsidian.toml")]
+        #[arg(default_value = "themes/synthwave.toml")]
         path: String,
     },
     /// List available themes in themes/
@@ -141,24 +128,10 @@ enum ThemeActions {
     Verify,
     /// Compare color tokens between active theme and target theme
     Diff {
-        #[arg(default_value = "themes/obsidian.toml")]
+        #[arg(default_value = "themes/synthwave.toml")]
         path_a: String,
-        #[arg(default_value = "themes/obsidian.toml")]
+        #[arg(default_value = "themes/synthwave.toml")]
         path_b: String,
-    },
-    /// Roll back target configurations to the previous state before the last theme transaction
-    Rollback,
-    /// Compile target configurations and perform target-aware hot reloads
-    Apply {
-        #[arg(default_value = "themes/obsidian.toml")]
-        path: String,
-    },
-    /// Run single-pass diagnostic checklist across theme and icon system pipelines
-    Doctor,
-    /// Manage icon role colors (alias for minimalctl icon)
-    Icon {
-        #[command(subcommand)]
-        action: IconActions,
     },
 }
 
@@ -172,7 +145,13 @@ fn main() {
             status.print_report();
         }
         Commands::Doctor => {
-            let report = DoctorReport::run();
+            let report = DoctorReport::run(&root);
+            if report.fail_count > 0 {
+                std::process::exit(1);
+            }
+        }
+        Commands::Audit => {
+            let report = AuditReport::run(&root);
             if report.fail_count > 0 {
                 std::process::exit(1);
             }
@@ -201,7 +180,7 @@ fn main() {
                 }
             }
             ThemeActions::Current => {
-                let active_theme_path = root.join("themes/obsidian.toml");
+                let active_theme_path = root.join("themes/synthwave.toml");
                 match Theme::load_from_file(&active_theme_path) {
                     Ok(theme) => {
                         println!("=== ACTIVE THEME CONFIGURATION ===");
@@ -260,38 +239,6 @@ fn main() {
                     }
                 }
             }
-            ThemeActions::Rollback => {
-                println!("[minimalctl] Restoring target configuration rollback backup...");
-                if let Err(e) = Theme::perform_rollback(&root) {
-                    eprintln!("[!] Rollback failed: {}", e);
-                    std::process::exit(1);
-                }
-            }
-            ThemeActions::Apply { path } => {
-                let resolved = resolve_theme_path(&path, &root);
-                println!(
-                    "[minimalctl] Applying theme transaction from: {}",
-                    resolved.display()
-                );
-                match Theme::load_from_file(&resolved) {
-                    Ok(theme) => {
-                        let _ = theme.backup_state(&root);
-                        if let Err(e) = theme.apply_runtime(&root) {
-                            eprintln!("[!] Transaction aborted: {}", e);
-                            std::process::exit(1);
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("[!] Theme validation error (Transaction aborted): {}", e);
-                        std::process::exit(1);
-                    }
-                }
-            }
-            ThemeActions::Doctor => {
-                if Theme::run_doctor(&root).is_err() {
-                    std::process::exit(1);
-                }
-            }
             ThemeActions::List => {
                 println!("=== AVAILABLE THEMES ===");
                 let themes_dir = root.join("themes");
@@ -314,24 +261,15 @@ fn main() {
             ThemeActions::Verify => {
                 println!("[minimalctl] Verifying theme definition and target drift...");
                 let mut drift = false;
-                let active_theme_path = root.join("themes/obsidian.toml");
+                let active_theme_path = root.join("themes/synthwave.toml");
                 match Theme::load_from_file(&active_theme_path) {
                     Ok(theme) => {
-                        println!(" - themes/obsidian.toml: Valid TOML, all hex tokens verified.");
-
-                        if let Ok(content) = fs::read_to_string(root.join("kitty/kitty.conf")) {
-                            if content != theme.generate_kitty_conf() {
-                                eprintln!("[!] DRIFT: kitty/kitty.conf differs from compiled obsidian.toml output!");
-                                drift = true;
-                            } else {
-                                println!(" - kitty/kitty.conf: In sync with source.");
-                            }
-                        }
+                        println!(" - themes/synthwave.toml: Valid TOML, all hex tokens verified.");
 
                         if let Ok(content) = fs::read_to_string(root.join("starship/starship.toml"))
                         {
                             if content != theme.generate_starship_toml() {
-                                eprintln!("[!] DRIFT: starship/starship.toml differs from compiled obsidian.toml output!");
+                                eprintln!("[!] DRIFT: starship/starship.toml differs from compiled synthwave.toml output!");
                                 drift = true;
                             } else {
                                 println!(" - starship/starship.toml: In sync with source.");
@@ -340,20 +278,28 @@ fn main() {
 
                         if let Ok(content) = fs::read_to_string(root.join("btop/btop.theme")) {
                             if content != theme.generate_btop_theme() {
-                                eprintln!("[!] DRIFT: btop/btop.theme differs from compiled obsidian.toml output!");
+                                eprintln!("[!] DRIFT: btop/btop.theme differs from compiled synthwave.toml output!");
                                 drift = true;
                             } else {
                                 println!(" - btop/btop.theme: In sync with source.");
                             }
                         }
 
-
                         if let Ok(content) = fs::read_to_string(root.join("tmux/tmux.conf")) {
                             if content != theme.generate_tmux_conf() {
-                                eprintln!("[!] DRIFT: tmux/tmux.conf differs from compiled obsidian.toml output!");
+                                eprintln!("[!] DRIFT: tmux/tmux.conf differs from compiled synthwave.toml output!");
                                 drift = true;
                             } else {
                                 println!(" - tmux/tmux.conf: In sync with source.");
+                            }
+                        }
+
+                        if let Ok(content) = fs::read_to_string(root.join("labwc/themerc")) {
+                            if content != theme.generate_labwc_themerc() {
+                                eprintln!("[!] DRIFT: labwc/themerc differs from compiled synthwave.toml output!");
+                                drift = true;
+                            } else {
+                                println!(" - labwc/themerc: In sync with source.");
                             }
                         }
 
@@ -361,7 +307,7 @@ fn main() {
                         if nvim_theme_file.exists() {
                             if let Ok(content) = fs::read_to_string(&nvim_theme_file) {
                                 if content != theme.generate_nvim_theme() {
-                                    eprintln!("[!] DRIFT: nvim/lua/themes/minimal.lua differs from compiled obsidian.toml output!");
+                                    eprintln!("[!] DRIFT: nvim/lua/themes/minimal.lua differs from compiled synthwave.toml output!");
                                     drift = true;
                                 } else {
                                     println!(
@@ -370,10 +316,9 @@ fn main() {
                                 }
                             }
                         }
-
                     }
                     Err(e) => {
-                        eprintln!("[!] ERROR: Failed to parse themes/obsidian.toml: {}", e);
+                        eprintln!("[!] ERROR: Failed to parse themes/synthwave.toml: {}", e);
                         drift = true;
                     }
                 }
@@ -387,20 +332,14 @@ fn main() {
                     );
                 }
             }
-            ThemeActions::Icon { action } => {
-                handle_icon_action(action, &root);
-            }
         },
-        Commands::Icon { action } => {
-            handle_icon_action(action, &root);
-        }
         Commands::Config { action } => match action {
             ConfigActions::Verify => {
                 println!("=== REPOSITORY CONFIGURATION VERIFICATION ===");
                 let required_dirs = [
-                    "hypr",
-                    "quickshell",
-                    "kitty",
+                    "labwc",
+                    "foot",
+                    "fuzzel",
                     "tmux",
                     "zsh",
                     "starship",
@@ -420,7 +359,6 @@ fn main() {
                     }
                 }
 
-
                 if valid {
                     println!("[minimalctl] Repository configuration verification PASSED.");
                 } else {
@@ -429,138 +367,5 @@ fn main() {
                 }
             }
         },
-    }
-}
-
-fn handle_icon_action(action: IconActions, root: &Path) {
-    let active_theme_path = root.join("themes/obsidian.toml");
-    let mut theme = match Theme::load_from_file(&active_theme_path) {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!("[!] Failed to load active theme: {}", e);
-            std::process::exit(1);
-        }
-    };
-
-    match action {
-        IconActions::List => {
-            println!("=== MINIMAL ICON COLOR ROLES ===");
-            let roles = theme
-                .icon_roles
-                .clone()
-                .unwrap_or_else(|| theme::IconRoles {
-                    default: "text".into(),
-                    active: "primary".into(),
-                    muted: "muted".into(),
-                    disabled: "disabled".into(),
-                    success: "success".into(),
-                    warning: "warning".into(),
-                    error: "danger".into(),
-                    info: "info".into(),
-                });
-
-            let items = [
-                ("default", &roles.default),
-                ("active", &roles.active),
-                ("muted", &roles.muted),
-                ("disabled", &roles.disabled),
-                ("success", &roles.success),
-                ("warning", &roles.warning),
-                ("error", &roles.error),
-                ("info", &roles.info),
-            ];
-
-            for (name, val) in items.iter() {
-                let resolved = theme.resolve_icon_color(val);
-                println!(" - {:<10} : {:<12} ({})", name, val, resolved);
-            }
-        }
-        IconActions::Get { role } => {
-            let roles = theme
-                .icon_roles
-                .clone()
-                .unwrap_or_else(|| theme::IconRoles {
-                    default: "text".into(),
-                    active: "primary".into(),
-                    muted: "muted".into(),
-                    disabled: "disabled".into(),
-                    success: "success".into(),
-                    warning: "warning".into(),
-                    error: "danger".into(),
-                    info: "info".into(),
-                });
-
-            let val = match role.to_lowercase().as_str() {
-                "default" => &roles.default,
-                "active" => &roles.active,
-                "muted" => &roles.muted,
-                "disabled" => &roles.disabled,
-                "success" => &roles.success,
-                "warning" => &roles.warning,
-                "error" | "danger" => &roles.error,
-                "info" => &roles.info,
-                _ => {
-                    eprintln!(
-                        "[!] Unknown icon role '{}'. Valid roles: default, active, muted, disabled, success, warning, error, info",
-                        role
-                    );
-                    std::process::exit(1);
-                }
-            };
-            let resolved = theme.resolve_icon_color(val);
-            println!("{}", resolved);
-        }
-        IconActions::Set { role, color } => {
-            if let Err(e) = theme.update_icon_role(&role, &color) {
-                eprintln!("[!] Error updating icon role: {}", e);
-                std::process::exit(1);
-            }
-
-            if let Err(e) = theme.save_to_file(&active_theme_path) {
-                eprintln!("[!] Error saving theme file: {}", e);
-                std::process::exit(1);
-            }
-
-            println!(
-                "[minimalctl] Updated icon role '{}' to '{}' in {}",
-                role,
-                color,
-                active_theme_path.display()
-            );
-
-            let _ = theme.backup_state(root);
-            if let Err(e) = theme.apply_runtime(root) {
-                eprintln!("[!] Failed to apply runtime theme transaction: {}", e);
-                std::process::exit(1);
-            }
-        }
-        IconActions::Reset => {
-            theme.icon_roles = Some(theme::IconRoles {
-                default: "text".into(),
-                active: "primary".into(),
-                muted: "muted".into(),
-                disabled: "disabled".into(),
-                success: "success".into(),
-                warning: "warning".into(),
-                error: "danger".into(),
-                info: "info".into(),
-            });
-
-            if let Err(e) = theme.save_to_file(&active_theme_path) {
-                eprintln!("[!] Error saving theme file: {}", e);
-                std::process::exit(1);
-            }
-
-            println!(
-                "[minimalctl] Reset icon roles to theme defaults in {}",
-                active_theme_path.display()
-            );
-
-            let _ = theme.backup_state(root);
-            if let Err(e) = theme.apply_runtime(root) {
-                eprintln!("[!] Failed to apply runtime theme transaction: {}", e);
-                std::process::exit(1);
-            }
-        }
     }
 }
