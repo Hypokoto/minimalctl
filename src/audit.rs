@@ -166,6 +166,7 @@ impl AuditReport {
             "labwc/scripts/osd-volume.sh",
             "labwc/scripts/powermenu.sh",
             "labwc/scripts/screen-record.sh",
+            "labwc/scripts/clipboard.sh",
         ];
 
         #[cfg(unix)]
