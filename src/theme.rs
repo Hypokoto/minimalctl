@@ -1289,15 +1289,15 @@ standard_dialogs=default
     pub fn build_all<P: AsRef<Path>>(&self, root_dir: P) -> Result<(), String> {
         let root = root_dir.as_ref();
 
-        Self::atomic_write(root.join("common/kitty/kitty.conf"), &self.generate_kitty_conf())?;
+        Self::atomic_write(root.join("kitty/kitty.conf"), &self.generate_kitty_conf())?;
         Self::atomic_write(
-            root.join("common/starship/starship.toml"),
+            root.join("starship/starship.toml"),
             &self.generate_starship_toml(),
         )?;
-        Self::atomic_write(root.join("common/btop/btop.theme"), &self.generate_btop_theme())?;
+        Self::atomic_write(root.join("btop/btop.theme"), &self.generate_btop_theme())?;
         Self::atomic_write(root.join("labwc/hypr/colors.conf"), &self.generate_hypr_colors())?;
         Self::atomic_write(root.join("sway/colors"), &self.generate_sway_colors())?;
-        Self::atomic_write(root.join("common/tmux/tmux.conf"), &self.generate_tmux_conf())?;
+        Self::atomic_write(root.join("tmux/tmux.conf"), &self.generate_tmux_conf())?;
 
         let quickshell_target = if let Ok(home) = std::env::var("HOME") {
             PathBuf::from(home).join(".config/quickshell/theme.json")
@@ -1306,7 +1306,7 @@ standard_dialogs=default
         };
         Self::atomic_write(quickshell_target, &self.generate_quickshell_theme())?;
 
-        let nvim_theme_dir = root.join("common/nvim/lua/themes");
+        let nvim_theme_dir = root.join("nvim/lua/themes");
         if nvim_theme_dir.exists() {
             Self::atomic_write(
                 nvim_theme_dir.join("minimal.lua"),
@@ -1349,11 +1349,11 @@ standard_dialogs=default
         fs::create_dir_all(&backup_dir).map_err(|e| e.to_string())?;
 
         let files = [
-            "common/kitty/kitty.conf",
-            "common/starship/starship.toml",
-            "common/btop/btop.theme",
+            "kitty/kitty.conf",
+            "starship/starship.toml",
+            "btop/btop.theme",
             "labwc/hypr/colors.conf",
-            "common/tmux/tmux.conf",
+            "tmux/tmux.conf",
         ];
 
         for rel in files.iter() {
@@ -1364,7 +1364,7 @@ standard_dialogs=default
             }
         }
 
-        let nvim_src = root.join("common/nvim/lua/themes/minimal.lua");
+        let nvim_src = root.join("nvim/lua/themes/minimal.lua");
         if nvim_src.exists() {
             let _ = fs::copy(&nvim_src, backup_dir.join("nvim_lua_themes_minimal.lua"));
         }
@@ -1380,12 +1380,12 @@ standard_dialogs=default
         }
 
         let files = [
-            ("kitty_kitty.conf", "common/kitty/kitty.conf"),
-            ("starship_starship.toml", "common/starship/starship.toml"),
-            ("btop_btop.theme", "common/btop/btop.theme"),
+            ("kitty_kitty.conf", "kitty/kitty.conf"),
+            ("starship_starship.toml", "starship/starship.toml"),
+            ("btop_btop.theme", "btop/btop.theme"),
             ("hypr_colors.conf", "labwc/hypr/colors.conf"),
-            ("tmux_tmux.conf", "common/tmux/tmux.conf"),
-            ("nvim_lua_themes_minimal.lua", "common/nvim/lua/themes/minimal.lua"),
+            ("tmux_tmux.conf", "tmux/tmux.conf"),
+            ("nvim_lua_themes_minimal.lua", "nvim/lua/themes/minimal.lua"),
         ];
 
         for (bak_name, target_rel) in files.iter() {
@@ -1464,12 +1464,12 @@ standard_dialogs=default
         }
 
         if tmux_active {
-            let tmux_conf = std::fs::canonicalize(root.join("common/tmux/tmux.conf"))
-                .unwrap_or_else(|_| root.join("common/tmux/tmux.conf"));
+            let tmux_conf = std::fs::canonicalize(root.join("tmux/tmux.conf"))
+                .unwrap_or_else(|_| root.join("tmux/tmux.conf"));
             let _ = std::process::Command::new("tmux")
                 .args([
                     "source-file",
-                    tmux_conf.to_str().unwrap_or("common/tmux/tmux.conf"),
+                    tmux_conf.to_str().unwrap_or("tmux/tmux.conf"),
                 ])
                 .output();
             if let Ok(home) = std::env::var("HOME") {

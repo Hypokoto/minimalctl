@@ -319,53 +319,53 @@ fn main() {
                     Ok(theme) => {
                         println!(" - themes/obsidian.toml: Valid TOML, all hex tokens verified.");
 
-                        if let Ok(content) = fs::read_to_string(root.join("common/kitty/kitty.conf")) {
+                        if let Ok(content) = fs::read_to_string(root.join("kitty/kitty.conf")) {
                             if content != theme.generate_kitty_conf() {
-                                eprintln!("[!] DRIFT: common/kitty/kitty.conf differs from compiled obsidian.toml output!");
+                                eprintln!("[!] DRIFT: kitty/kitty.conf differs from compiled obsidian.toml output!");
                                 drift = true;
                             } else {
-                                println!(" - common/kitty/kitty.conf: In sync with source.");
+                                println!(" - kitty/kitty.conf: In sync with source.");
                             }
                         }
 
-                        if let Ok(content) = fs::read_to_string(root.join("common/starship/starship.toml"))
+                        if let Ok(content) = fs::read_to_string(root.join("starship/starship.toml"))
                         {
                             if content != theme.generate_starship_toml() {
-                                eprintln!("[!] DRIFT: common/starship/starship.toml differs from compiled obsidian.toml output!");
+                                eprintln!("[!] DRIFT: starship/starship.toml differs from compiled obsidian.toml output!");
                                 drift = true;
                             } else {
-                                println!(" - common/starship/starship.toml: In sync with source.");
+                                println!(" - starship/starship.toml: In sync with source.");
                             }
                         }
 
-                        if let Ok(content) = fs::read_to_string(root.join("common/btop/btop.theme")) {
+                        if let Ok(content) = fs::read_to_string(root.join("btop/btop.theme")) {
                             if content != theme.generate_btop_theme() {
-                                eprintln!("[!] DRIFT: common/btop/btop.theme differs from compiled obsidian.toml output!");
+                                eprintln!("[!] DRIFT: btop/btop.theme differs from compiled obsidian.toml output!");
                                 drift = true;
                             } else {
-                                println!(" - common/btop/btop.theme: In sync with source.");
+                                println!(" - btop/btop.theme: In sync with source.");
                             }
                         }
 
 
-                        if let Ok(content) = fs::read_to_string(root.join("common/tmux/tmux.conf")) {
+                        if let Ok(content) = fs::read_to_string(root.join("tmux/tmux.conf")) {
                             if content != theme.generate_tmux_conf() {
-                                eprintln!("[!] DRIFT: common/tmux/tmux.conf differs from compiled obsidian.toml output!");
+                                eprintln!("[!] DRIFT: tmux/tmux.conf differs from compiled obsidian.toml output!");
                                 drift = true;
                             } else {
-                                println!(" - common/tmux/tmux.conf: In sync with source.");
+                                println!(" - tmux/tmux.conf: In sync with source.");
                             }
                         }
 
-                        let nvim_theme_file = root.join("common/nvim/lua/themes/minimal.lua");
+                        let nvim_theme_file = root.join("nvim/lua/themes/minimal.lua");
                         if nvim_theme_file.exists() {
                             if let Ok(content) = fs::read_to_string(&nvim_theme_file) {
                                 if content != theme.generate_nvim_theme() {
-                                    eprintln!("[!] DRIFT: common/nvim/lua/themes/minimal.lua differs from compiled obsidian.toml output!");
+                                    eprintln!("[!] DRIFT: nvim/lua/themes/minimal.lua differs from compiled obsidian.toml output!");
                                     drift = true;
                                 } else {
                                     println!(
-                                        " - common/nvim/lua/themes/minimal.lua: In sync with source."
+                                        " - nvim/lua/themes/minimal.lua: In sync with source."
                                     );
                                 }
                             }

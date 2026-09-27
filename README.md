@@ -1,6 +1,6 @@
 # Minimal Dotfiles
 
-Modular, high-performance Linux desktop environment architecture built for Hyprland, Neovim (NvChad), Quickshell, and an AI-native Zsh terminal workspace. Features a refined, ultra-fast Quickshell presentation layer, native Rust theme control plane (`minimalctl`), Hyprtasking workspace overview, and hy3 tabbed window grouping.
+Modular, high-performance Linux desktop environment architecture built for labwc, Neovim (NvChad), Quickshell, and an AI-native Zsh terminal workspace. Features a refined, ultra-fast Quickshell presentation layer, native Rust theme control plane (`minimalctl`), Hyprtasking workspace overview, and hy3 tabbed window grouping.
 
 ---
 
@@ -42,7 +42,7 @@ minimalctl doctor
 ```
 
 `minimalctl theme apply` compiles 1 canonical source (`themes/*.toml`) into 7 active runtime targets live without logging out or killing session states:
-- `hyprland/hypr/colors.conf` — Hyprland `$variable` definitions (reloaded live via `hyprctl`)
+- `labwc/hypr/colors.conf` — labwc `$variable` definitions (reloaded live via `hyprctl`)
 - `common/kitty/kitty.conf` — Terminal palette & chrome (reloaded live via `SIGUSR1`)
 - `common/btop/btop.theme` — btop TUI color table
 - `common/starship/starship.toml` — Starship shell prompt (reloaded live on next prompt)
@@ -102,7 +102,7 @@ minimal/
 ├── git/
 │   └── config                     # Git & delta syntax pager configuration
 ├── hypr/
-│   ├── hyprland.lua               # Core Hyprland compositor entry point (Lua)
+│   ├── labwc.lua               # Core labwc compositor entry point (Lua)
 │   ├── keybinds.lua               # Global keybindings & media pipeline (Lua)
 │   ├── monitors.lua               # Display rules & monitor topology (Lua)
 │   └── wallpaper/                 # Wallpaper picker & daemon scripts
@@ -149,7 +149,7 @@ minimal/
 | `SUPER + X` | Toggle Quickshell Clipboard Manager | Clipboard |
 | `SUPER + N` | Toggle Quickshell Control Center | Quick Settings |
 | `SUPER + T` / `SUPER + ~` | Toggle Hyprtasking 3x3 workspace grid overview | Workspaces |
-| `SUPER + G` | Toggle Hyprland window tabbed grouping (`hy3`) | Windows |
+| `SUPER + G` | Toggle labwc window tabbed grouping (`hy3`) | Windows |
 | `SUPER + Q` | Close active window | Window Control |
 | `SUPER + F` | Toggle fullscreen window mode | Window Control |
 | `SUPER + B` | Toggle Quickshell Top Bar | Bar |
