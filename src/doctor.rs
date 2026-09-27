@@ -124,14 +124,26 @@ impl DoctorReport {
 
         // 8. Wayland Desktop Stack Availability (labwc, foot, fuzzel, mako)
         let mut wayland_ok = true;
+        let path_env = std::env::var("PATH").unwrap_or_default();
+        let path_dirs: Vec<std::path::PathBuf> = std::env::split_paths(&path_env).collect();
+
         for binary in &["labwc", "foot", "fuzzel", "mako"] {
-            let available = Command::new("command")
-                .args(["-v", binary])
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false)
-                || Path::new(&format!("/usr/bin/{}", binary)).exists()
-                || Path::new(&format!("/usr/local/bin/{}", binary)).exists();
+            let available = path_dirs.iter().any(|dir| {
+                let candidate = dir.join(binary);
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    if let Ok(meta) = candidate.metadata() {
+                        meta.is_file() && (meta.permissions().mode() & 0o111 != 0)
+                    } else {
+                        false
+                    }
+                }
+                #[cfg(not(unix))]
+                {
+                    candidate.is_file()
+                }
+            });
 
             if !available {
                 println!("[WARN] Wayland component binary not found in PATH: {}", binary);
