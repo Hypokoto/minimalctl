@@ -65,7 +65,6 @@ impl SystemStatus {
         println!("=== MINIMAL DESKTOP STATUS ===");
         println!();
         println!("SESSION STATE");
-        println!("  Hyprland             ● Running");
         println!("  Quickshell           ● Running");
         println!("  Hypridle             ● Running");
         println!("  awww-daemon          ● Running");

@@ -347,14 +347,6 @@ fn main() {
                             }
                         }
 
-                        if let Ok(content) = fs::read_to_string(root.join("hyprland/hypr/colors.conf")) {
-                            if content != theme.generate_hypr_colors() {
-                                eprintln!("[!] DRIFT: hyprland/hypr/colors.conf differs from compiled obsidian.toml output!");
-                                drift = true;
-                            } else {
-                                println!(" - hyprland/hypr/colors.conf: In sync with source.");
-                            }
-                        }
 
                         if let Ok(content) = fs::read_to_string(root.join("common/tmux/tmux.conf")) {
                             if content != theme.generate_tmux_conf() {
@@ -379,23 +371,6 @@ fn main() {
                             }
                         }
 
-                        let quickshell_theme_file = std::env::var("HOME")
-                            .map(|h| {
-                                std::path::PathBuf::from(h).join(".config/quickshell/theme.json")
-                            })
-                            .unwrap_or_else(|_| root.join("hyprland/quickshell/theme.json"));
-                        if quickshell_theme_file.exists() {
-                            if let Ok(content) = fs::read_to_string(&quickshell_theme_file) {
-                                if content != theme.generate_quickshell_theme() {
-                                    eprintln!("[!] DRIFT: ~/.config/quickshell/theme.json differs from compiled obsidian.toml output!");
-                                    drift = true;
-                                } else {
-                                    println!(
-                                        " - ~/.config/quickshell/theme.json: In sync with source."
-                                    );
-                                }
-                            }
-                        }
                     }
                     Err(e) => {
                         eprintln!("[!] ERROR: Failed to parse themes/obsidian.toml: {}", e);
@@ -445,19 +420,6 @@ fn main() {
                     }
                 }
 
-                let keybinds_file = root.join("hyprland/hypr/keybinds.lua");
-                if keybinds_file.exists() {
-                    if let Ok(content) = fs::read_to_string(&keybinds_file) {
-                        if content.contains("hl.bind") {
-                            println!(" [PASS] Hyprland keybindings configuration valid");
-                        } else {
-                            eprintln!(" [WARN] Hyprland keybindings file missing hl.bind calls");
-                        }
-                    }
-                } else {
-                    eprintln!(" [FAIL] Missing hyprland/hypr/keybinds.lua");
-                    valid = false;
-                }
 
                 if valid {
                     println!("[minimalctl] Repository configuration verification PASSED.");
