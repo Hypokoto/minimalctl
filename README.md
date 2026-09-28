@@ -95,6 +95,17 @@ Minimal replaces high-overhead shell daemon loops and external CLI wrappers with
 - **Fast Attribute Mapping**: Inspects `/sys/class/power_supply/BAT0/*` using memory-mapped attribute reads with safe sysfs fallback (<150μs latency).
 - **Direct D-Bus IPC**: Directly invokes `org.freedesktop.Notifications.Notify` via `sd_bus_call_method` with replaceable notification IDs. Completely eliminates `notify-send` fork overhead.
 
+### 2. Wayland Layer-Shell OSD Overlay (`src/minosd/` -> `target/minosd`)
+- **Protocol Integration**: Wayland `zwlr_layer_shell_v1` on `ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY`, anchored bottom.
+- **Hardware-Synced Synthwave Pill**: Renders `#14B9B5` (Electric Cyan) active progress bar on `#0E091D` acrylic pill via `pixman` with 12px pill rounding and vblank frame synchronization (`wl_surface.frame`).
+- **Zero-Latency Datagram Socket**: Listens on `/run/user/<uid>/minosd.sock` for 2-byte datagrams (`V+5`, `V-5`, `VM`, `B+10`, `B-10`), with auto-fade / surface unmapping after 1.2s.
+
+### 3. In-Memory Wayland Clipboard Ring (`src/minclip/` -> `target/minclip`)
+- **Direct Protocol Listener**: Implements Wayland `wl_data_device_manager` directly without `wl-paste` or `cliphist` subshells.
+- **50-Entry In-Memory Ring**: Zero disk I/O, deduplicated in-memory ring buffer with non-blocking pipes.
+- **Fuzzel & IPC Integration**: Socket server on `/run/user/<uid>/minclip.sock` supporting `minclip --list` stdout dumping and `minclip --copy <id>` clipboard restoration.
+- **Privacy Wipe**: Clears clipboard history immediately upon receiving `SIGUSR1` from screen locker.
+
 ---
 
 ## 📁 Repository Structure

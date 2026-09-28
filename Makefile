@@ -3,8 +3,12 @@
 CC ?= gcc
 CFLAGS ?= -O2 -Wall -Wextra
 LIBSYSTEMD ?= $(shell pkg-config --cflags --libs libsystemd 2>/dev/null || echo "-lsystemd")
+WAYLAND_FLAGS ?= $(shell pkg-config --cflags --libs wayland-client 2>/dev/null || echo "-lwayland-client")
+PIXMAN_FLAGS ?= $(shell pkg-config --cflags --libs pixman-1 2>/dev/null || echo "-lpixman-1")
 
-.PHONY: all build clean test audit doctor deploy help
+DAEMONS := target/minbat target/minosd target/minclip
+
+.PHONY: all build clean test audit doctor deploy help $(DAEMONS)
 
 all: build
 
@@ -21,13 +25,23 @@ target/minbat: src/minbat/main.c
 	@mkdir -p target
 	$(CC) $(CFLAGS) $< $(LIBSYSTEMD) -o $@
 
-build: target/minbat
+target/minosd: src/minosd/main.c src/minosd/wlr-layer-shell-unstable-v1-protocol.c src/minosd/xdg-shell-protocol.c
+	@mkdir -p target
+	$(CC) $(CFLAGS) -Isrc/minosd $< src/minosd/wlr-layer-shell-unstable-v1-protocol.c src/minosd/xdg-shell-protocol.c $(WAYLAND_FLAGS) $(PIXMAN_FLAGS) -lm -o $@
+
+target/minclip: src/minclip/main.c
+	@mkdir -p target
+	$(CC) $(CFLAGS) $< $(WAYLAND_FLAGS) -o $@
+
+build: $(DAEMONS)
 	@cargo build --release
 
-test: target/minbat
+test: $(DAEMONS)
 	@cargo test
 	@bash -n deploy.sh install.sh tty-init.sh scripts/*.sh labwc/scripts/*.sh 2>/dev/null || true
 	./target/minbat --dry-run
+	./target/minosd --dry-run
+	./target/minclip --dry-run
 
 audit:
 	@cargo run --quiet -- audit
@@ -40,4 +54,4 @@ deploy:
 
 clean:
 	@cargo clean
-	@rm -f target/minbat
+	@rm -f $(DAEMONS)
