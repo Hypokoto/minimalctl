@@ -191,7 +191,19 @@ static void handle_command(MinOsd *app, const char *cmd) {
             closedir(bl_dir);
         }
 
-        const char *step = (strcmp(cmd, "B+10") == 0 || strcmp(cmd, "B+5") == 0) ? "+5%" : "5%-";
+        const char *step = NULL;
+        if (strcmp(cmd, "B+10") == 0) {
+            step = "+10%";
+        } else if (strcmp(cmd, "B+5") == 0) {
+            step = "+5%";
+        } else if (strcmp(cmd, "B-10") == 0) {
+            step = "10%-";
+        } else if (strcmp(cmd, "B-5") == 0) {
+            step = "5%-";
+        } else {
+            return;
+        }
+
         char b_cmd[256];
         if (dev_name[0] != '\0') {
             snprintf(b_cmd, sizeof(b_cmd), "brightnessctl -d %s set %s >/dev/null 2>&1", dev_name, step);

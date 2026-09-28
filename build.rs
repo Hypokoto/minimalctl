@@ -81,7 +81,7 @@ fn main() {
         let minosd_dir = Path::new(&manifest_dir).join("src/minosd");
         let proto_layer = minosd_dir.join("wlr-layer-shell-unstable-v1-protocol.c");
         let proto_xdg = minosd_dir.join("xdg-shell-protocol.c");
-        let _ = Command::new(compiler.path())
+        let status = Command::new(compiler.path())
             .args(&[
                 "-O2",
                 "-Wall",
@@ -99,5 +99,11 @@ fn main() {
             .args(&["-lsystemd", "-lwayland-client", "-lpixman-1", "-lm", "-o"])
             .arg(&out_bin)
             .status();
+
+        match status {
+            Ok(st) if st.success() => {}
+            Ok(st) => panic!("mincore compilation failed with exit status: {}", st),
+            Err(e) => panic!("failed to execute {}: {}", compiler.path().display(), e),
+        }
     }
 }
