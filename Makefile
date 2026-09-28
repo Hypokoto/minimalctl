@@ -6,7 +6,7 @@ LIBSYSTEMD ?= $(shell pkg-config --cflags --libs libsystemd 2>/dev/null || echo 
 WAYLAND_FLAGS ?= $(shell pkg-config --cflags --libs wayland-client 2>/dev/null || echo "-lwayland-client")
 PIXMAN_FLAGS ?= $(shell pkg-config --cflags --libs pixman-1 2>/dev/null || echo "-lpixman-1")
 
-DAEMONS := target/minbat target/minosd target/minclip
+DAEMONS := target/minbat target/minosd target/minclip target/mincore
 PALETTE_H := src/minosd/palette.h
 
 .PHONY: all build clean test audit doctor deploy help palette $(DAEMONS)
@@ -39,6 +39,10 @@ target/minclip: src/minclip/main.c
 	@mkdir -p target
 	$(CC) $(CFLAGS) $< $(WAYLAND_FLAGS) -o $@
 
+target/mincore: src/mincore/main.c src/minbat/main.c src/minosd/main.c $(PALETTE_H) src/minosd/wlr-layer-shell-unstable-v1-protocol.c src/minosd/xdg-shell-protocol.c src/minclip/main.c
+	@mkdir -p target
+	$(CC) $(CFLAGS) -DMINCORE_UNIFIED -Isrc/minosd src/mincore/main.c src/minbat/main.c src/minosd/main.c src/minosd/wlr-layer-shell-unstable-v1-protocol.c src/minosd/xdg-shell-protocol.c src/minclip/main.c $(LIBSYSTEMD) $(WAYLAND_FLAGS) $(PIXMAN_FLAGS) -lm -o $@
+
 build: $(DAEMONS)
 	@cargo build --release
 
@@ -48,6 +52,7 @@ test: $(DAEMONS)
 	./target/minbat --dry-run
 	./target/minosd --dry-run
 	./target/minclip --dry-run
+	./target/mincore --dry-run
 
 audit:
 	@cargo run --quiet -- audit

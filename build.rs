@@ -73,4 +73,31 @@ fn main() {
             .arg(&out_bin)
             .status();
     }
+
+    // 4. mincore (unified multi-call binary)
+    let mincore_src = Path::new(&manifest_dir).join("src/mincore/main.c");
+    if mincore_src.exists() && minbat_src.exists() && minosd_src.exists() && minclip_src.exists() {
+        let out_bin = target_dir.join("mincore");
+        let minosd_dir = Path::new(&manifest_dir).join("src/minosd");
+        let proto_layer = minosd_dir.join("wlr-layer-shell-unstable-v1-protocol.c");
+        let proto_xdg = minosd_dir.join("xdg-shell-protocol.c");
+        let _ = Command::new(compiler.path())
+            .args(&[
+                "-O2",
+                "-Wall",
+                "-Wextra",
+                "-DMINCORE_UNIFIED",
+                "-Isrc/minosd",
+                "-I/usr/include/pixman-1",
+            ])
+            .arg(&mincore_src)
+            .arg(&minbat_src)
+            .arg(&minosd_src)
+            .arg(&proto_layer)
+            .arg(&proto_xdg)
+            .arg(&minclip_src)
+            .args(&["-lsystemd", "-lwayland-client", "-lpixman-1", "-lm", "-o"])
+            .arg(&out_bin)
+            .status();
+    }
 }

@@ -1,3 +1,4 @@
 # Rust and C build artifacts
 /target/
 .codeql/
+graphify-out/

@@ -284,8 +284,11 @@ static int client_ipc_request(const char *cmd) {
     close(fd);
     return 0;
 }
-
+#ifdef MINCORE_UNIFIED
+int minclip_main(int argc, char *argv[]) {
+#else
 int main(int argc, char *argv[]) {
+#endif
     if (argc > 1) {
         if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
             printf("minclip — Zero-I/O in-memory Wayland clipboard ring\n");

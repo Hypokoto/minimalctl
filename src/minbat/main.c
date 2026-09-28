@@ -196,8 +196,11 @@ static void evaluate_battery(sd_bus **bus, const BatteryInfo *info, MonitorState
         }
     }
 }
-
+#ifdef MINCORE_UNIFIED
+int minbat_main(int argc, char *argv[]) {
+#else
 int main(int argc, char *argv[]) {
+#endif
     bool dry_run = false;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--dry-run") == 0) {

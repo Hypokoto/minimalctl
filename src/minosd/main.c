@@ -291,8 +291,11 @@ static int send_client_command(const char *cmd) {
     close(fd);
     return (n > 0) ? 0 : -1;
 }
-
+#ifdef MINCORE_UNIFIED
+int minosd_main(int argc, char *argv[]) {
+#else
 int main(int argc, char *argv[]) {
+#endif
     if (argc > 1) {
         if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
             printf("minosd — Wayland Layer-Shell OSD Overlay (Synthwave)\n");
