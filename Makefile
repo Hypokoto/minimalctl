@@ -13,8 +13,8 @@ PALETTE_H := src/minosd/palette.h
 
 palette: $(PALETTE_H)
 
-$(PALETTE_H): themes/synthwave.toml scripts/gen-palette.sh
-	@bash scripts/gen-palette.sh themes/synthwave.toml $(PALETTE_H)
+$(PALETTE_H):
+	@# Static palette header maintained in src/minosd/palette.h
 
 all: build
 

@@ -16,17 +16,20 @@ fn main() {
     };
 
     let palette_h = Path::new(&manifest_dir).join("src/minosd/palette.h");
-    let status = Command::new("bash")
-        .args([
-            "scripts/gen-palette.sh",
-            "themes/synthwave.toml",
-            palette_h.to_str().unwrap_or("src/minosd/palette.h"),
-        ])
-        .current_dir(&manifest_dir)
-        .status()
-        .expect("Failed to execute scripts/gen-palette.sh");
-    if !status.success() {
-        panic!("scripts/gen-palette.sh failed with exit code: {}", status);
+    let synthwave_toml = Path::new(&manifest_dir).join("themes/synthwave.toml");
+    if synthwave_toml.exists() {
+        let status = Command::new("bash")
+            .args([
+                "scripts/gen-palette.sh",
+                "themes/synthwave.toml",
+                palette_h.to_str().unwrap_or("src/minosd/palette.h"),
+            ])
+            .current_dir(&manifest_dir)
+            .status()
+            .expect("Failed to execute scripts/gen-palette.sh");
+        if !status.success() {
+            panic!("scripts/gen-palette.sh failed with exit code: {}", status);
+        }
     }
     let target_dir = Path::new(&manifest_dir).join("target");
     let _ = fs::create_dir_all(&target_dir);

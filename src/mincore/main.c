@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
+#include <signal.h>
 
 int minbat_main(int argc, char *argv[]);
 int minosd_main(int argc, char *argv[]);
@@ -33,7 +34,7 @@ static int run_status(void) {
     const char *daemons[] = {"minbat", "minosd", "minclip", "labwc", "foot", "mako"};
     for (size_t i = 0; i < sizeof(daemons) / sizeof(daemons[0]); i++) {
         char cmd[256];
-        snprintf(cmd, sizeof(cmd), "pgrep -u %d -x %s >/dev/null 2>&1 || pgrep -u %d -f 'mincore %s' >/dev/null 2>&1",
+        snprintf(cmd, sizeof(cmd), "pgrep -u %d -x %s >/dev/null 2>&1 || pgrep -u %d -f '[m]incore %s' >/dev/null 2>&1",
                  getuid(), daemons[i], getuid(), daemons[i]);
         int running = (system(cmd) == 0);
         printf("  %-18s %s\n", daemons[i], running ? "● Running" : "○ Stopped");
@@ -64,6 +65,16 @@ static int run_dry_run(void) {
     return 0;
 }
 
+static void cleanup_children(pid_t p1, pid_t p2, pid_t p3) {
+    pid_t pids[3] = {p1, p2, p3};
+    for (int i = 0; i < 3; i++) {
+        if (pids[i] > 0) {
+            kill(pids[i], SIGTERM);
+            waitpid(pids[i], NULL, 0);
+        }
+    }
+}
+
 static int run_daemon_supervisor(void) {
     printf("mincore: Launching background daemons (bat, osd, clip)...\n");
 
@@ -82,6 +93,7 @@ static int run_daemon_supervisor(void) {
     pid_t p_osd = fork();
     if (p_osd < 0) {
         perror("mincore: fork minosd failed");
+        cleanup_children(p_bat, 0, 0);
         return 1;
     }
     if (p_osd == 0) {
@@ -94,6 +106,7 @@ static int run_daemon_supervisor(void) {
     pid_t p_clip = fork();
     if (p_clip < 0) {
         perror("mincore: fork minclip failed");
+        cleanup_children(p_bat, p_osd, 0);
         return 1;
     }
     if (p_clip == 0) {
@@ -106,16 +119,26 @@ static int run_daemon_supervisor(void) {
     /* Verify children didn't fail immediately on startup */
     usleep(50000);
     int status;
-    if (waitpid(p_bat, &status, WNOHANG) > 0 && WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-        fprintf(stderr, "mincore: minbat exited early with code %d\n", WEXITSTATUS(status));
+    pid_t w;
+
+    w = waitpid(p_bat, &status, WNOHANG);
+    if (w > 0 && ((WIFEXITED(status) && WEXITSTATUS(status) != 0) || WIFSIGNALED(status))) {
+        fprintf(stderr, "mincore: minbat exited early\n");
+        cleanup_children(0, p_osd, p_clip);
         return 1;
     }
-    if (waitpid(p_osd, &status, WNOHANG) > 0 && WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-        fprintf(stderr, "mincore: minosd exited early with code %d\n", WEXITSTATUS(status));
+
+    w = waitpid(p_osd, &status, WNOHANG);
+    if (w > 0 && ((WIFEXITED(status) && WEXITSTATUS(status) != 0) || WIFSIGNALED(status))) {
+        fprintf(stderr, "mincore: minosd exited early\n");
+        cleanup_children(p_bat, 0, p_clip);
         return 1;
     }
-    if (waitpid(p_clip, &status, WNOHANG) > 0 && WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-        fprintf(stderr, "mincore: minclip exited early with code %d\n", WEXITSTATUS(status));
+
+    w = waitpid(p_clip, &status, WNOHANG);
+    if (w > 0 && ((WIFEXITED(status) && WEXITSTATUS(status) != 0) || WIFSIGNALED(status))) {
+        fprintf(stderr, "mincore: minclip exited early\n");
+        cleanup_children(p_bat, p_osd, 0);
         return 1;
     }
 

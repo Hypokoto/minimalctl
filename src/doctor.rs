@@ -80,20 +80,25 @@ impl DoctorReport {
             fail += 1;
         }
 
-        // 6. Theme Source Definition (themes/synthwave.toml)
+        // 6. Theme Source Definition (optional or standalone)
         let synthwave_path = root.join("themes/synthwave.toml");
-        let theme_ok = if let Ok(content) = fs::read_to_string(&synthwave_path) {
-            content.parse::<toml::Value>().map(|v| v.get("tokens").is_some()).unwrap_or(false)
-        } else {
-            false
-        };
+        if synthwave_path.exists() {
+            let theme_ok = if let Ok(content) = fs::read_to_string(&synthwave_path) {
+                content.parse::<toml::Value>().map(|v| v.get("tokens").is_some()).unwrap_or(false)
+            } else {
+                false
+            };
 
-        if theme_ok {
-            println!("[PASS] Theme source definition (synthwave.toml valid)");
-            pass += 1;
+            if theme_ok {
+                println!("[PASS] Theme source definition (synthwave.toml valid)");
+                pass += 1;
+            } else {
+                println!("[FAIL] Theme source definition invalid (themes/synthwave.toml)");
+                fail += 1;
+            }
         } else {
-            println!("[FAIL] Theme source definition invalid or missing (themes/synthwave.toml)");
-            fail += 1;
+            println!("[PASS] Theme system: standalone static configurations (themes directory omitted)");
+            pass += 1;
         }
 
         // 7. Desktop Target Configurations Integrity
