@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
@@ -22,19 +23,12 @@
 
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
+#include "palette.h"
 
 #define OSD_WIDTH   260
 #define OSD_HEIGHT  38
 #define OSD_RADIUS  19
 #define FADE_MS     1200
-
-// Synthwave Palette (ARGB8888)
-#define COLOR_BG      0xE60E091D  // #0E091D with 90% alpha
-#define COLOR_BORDER  0xFF342946  // #342946 overlay border
-#define COLOR_TRACK   0xFF241B2F  // #241B2F plum track
-#define COLOR_BAR     0xFF14B9B5  // #14B9B5 electric cyan bar
-#define COLOR_MUTED   0xFFBE3F50  // #BE3F50 crimson bar when muted
-#define COLOR_TEXT    0xFFEDE6F5  // #EDE6F5 crisp white text
 
 typedef struct {
     struct wl_display *display;
@@ -170,26 +164,55 @@ static void handle_command(MinOsd *app, const char *cmd) {
             pclose(fp);
         }
     } else if (t == 'B') {
-        if (strcmp(cmd, "B+10") == 0 || strcmp(cmd, "B+5") == 0) {
-            system("brightnessctl set +5% >/dev/null 2>&1");
-        } else if (strcmp(cmd, "B-10") == 0 || strcmp(cmd, "B-5") == 0) {
-            system("brightnessctl set 5%- >/dev/null 2>&1");
-        }
         app->muted = false;
-        // Read directly from /sys/class/backlight
-        FILE *f_cur = fopen("/sys/class/backlight/amdgpu_bl2/brightness", "r");
-        FILE *f_max = fopen("/sys/class/backlight/amdgpu_bl2/max_brightness", "r");
-        if (!f_cur) f_cur = fopen("/sys/class/backlight/intel_backlight/brightness", "r");
-        if (!f_max) f_max = fopen("/sys/class/backlight/intel_backlight/max_brightness", "r");
-
+        char dev_name[256] = {0};
         int cur = 0, max = 0;
-        if (f_cur && f_max && fscanf(f_cur, "%d", &cur) == 1 && fscanf(f_max, "%d", &max) == 1 && max > 0) {
-            app->percent = (cur * 100) / max;
+        DIR *bl_dir = opendir("/sys/class/backlight");
+        if (bl_dir) {
+            struct dirent *de;
+            while ((de = readdir(bl_dir)) != NULL) {
+                if (de->d_name[0] == '.') continue;
+                char cur_path[512], max_path[512];
+                snprintf(cur_path, sizeof(cur_path), "/sys/class/backlight/%s/brightness", de->d_name);
+                snprintf(max_path, sizeof(max_path), "/sys/class/backlight/%s/max_brightness", de->d_name);
+                FILE *f_cur = fopen(cur_path, "r");
+                FILE *f_max = fopen(max_path, "r");
+                if (f_cur && f_max && fscanf(f_cur, "%d", &cur) == 1 &&
+                    fscanf(f_max, "%d", &max) == 1 && max > 0) {
+                    snprintf(dev_name, sizeof(dev_name), "%s", de->d_name);
+                    fclose(f_cur);
+                    fclose(f_max);
+                    break;
+                }
+                if (f_cur) fclose(f_cur);
+                if (f_max) fclose(f_max);
+                cur = max = 0;
+            }
+            closedir(bl_dir);
+        }
+
+        const char *step = (strcmp(cmd, "B+10") == 0 || strcmp(cmd, "B+5") == 0) ? "+5%" : "5%-";
+        char b_cmd[256];
+        if (dev_name[0] != '\0') {
+            snprintf(b_cmd, sizeof(b_cmd), "brightnessctl -d %s set %s >/dev/null 2>&1", dev_name, step);
+        } else {
+            snprintf(b_cmd, sizeof(b_cmd), "brightnessctl set %s >/dev/null 2>&1", step);
+        }
+        system(b_cmd);
+
+        if (dev_name[0] != '\0' && max > 0) {
+            char cur_path[512];
+            snprintf(cur_path, sizeof(cur_path), "/sys/class/backlight/%s/brightness", dev_name);
+            FILE *f_cur = fopen(cur_path, "r");
+            if (f_cur && fscanf(f_cur, "%d", &cur) == 1) {
+                app->percent = (cur * 100) / max;
+            } else {
+                app->percent = (cur * 100) / max;
+            }
+            if (f_cur) fclose(f_cur);
         } else {
             app->percent = 50;
         }
-        if (f_cur) fclose(f_cur);
-        if (f_max) fclose(f_max);
     }
 
     show_osd(app);
@@ -351,7 +374,10 @@ int main(int argc, char *argv[]) {
     unlink(saddr.sun_path);
 
     app.sock_fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
-    bind(app.sock_fd, (struct sockaddr *)&saddr, sizeof(saddr));
+    if (app.sock_fd < 0 || bind(app.sock_fd, (struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
+        fprintf(stderr, "minosd: Failed to bind command socket\n");
+        return 1;
+    }
 
     app.timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
 

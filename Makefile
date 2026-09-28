@@ -7,8 +7,14 @@ WAYLAND_FLAGS ?= $(shell pkg-config --cflags --libs wayland-client 2>/dev/null |
 PIXMAN_FLAGS ?= $(shell pkg-config --cflags --libs pixman-1 2>/dev/null || echo "-lpixman-1")
 
 DAEMONS := target/minbat target/minosd target/minclip
+PALETTE_H := src/minosd/palette.h
 
-.PHONY: all build clean test audit doctor deploy help $(DAEMONS)
+.PHONY: all build clean test audit doctor deploy help palette $(DAEMONS)
+
+palette: $(PALETTE_H)
+
+$(PALETTE_H): themes/synthwave.toml scripts/gen-palette.sh
+	@bash scripts/gen-palette.sh themes/synthwave.toml $(PALETTE_H)
 
 all: build
 
@@ -25,7 +31,7 @@ target/minbat: src/minbat/main.c
 	@mkdir -p target
 	$(CC) $(CFLAGS) $< $(LIBSYSTEMD) -o $@
 
-target/minosd: src/minosd/main.c src/minosd/wlr-layer-shell-unstable-v1-protocol.c src/minosd/xdg-shell-protocol.c
+target/minosd: src/minosd/main.c $(PALETTE_H) src/minosd/wlr-layer-shell-unstable-v1-protocol.c src/minosd/xdg-shell-protocol.c
 	@mkdir -p target
 	$(CC) $(CFLAGS) -Isrc/minosd $< src/minosd/wlr-layer-shell-unstable-v1-protocol.c src/minosd/xdg-shell-protocol.c $(WAYLAND_FLAGS) $(PIXMAN_FLAGS) -lm -o $@
 

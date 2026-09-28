@@ -21,44 +21,57 @@ impl AuditReport {
 
         // 1. Script Security Invariants (No unsafe eval, remote execution, unquoted PID temp files)
         let mut script_violation = false;
-        let script_dirs = ["labwc/scripts", "scripts", "systemd"];
-        for dir in script_dirs {
+        let mut script_paths: Vec<_> = ["deploy.sh", "install.sh", "tty-init.sh"]
+            .iter()
+            .map(|s| root.join(s))
+            .filter(|p| p.exists())
+            .collect();
+
+        for dir in ["labwc/scripts", "scripts", "systemd", "zsh", "security"] {
             let p = root.join(dir);
-            if p.exists() {
-                if let Ok(entries) = fs::read_dir(p) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if path.file_name().and_then(|n| n.to_str()) == Some("audit-security.sh") {
-                            continue;
-                        }
-                        if path.extension().map_or(false, |ext| ext == "sh") {
-                            if let Ok(content) = fs::read_to_string(&path) {
-                                for (i, line) in content.lines().enumerate() {
-                                    if line.contains("eval ") && !line.contains("Ignore/Safe") {
-                                        println!("[FAIL] Unsafe eval in {}:{}", path.display(), i + 1);
-                                        script_violation = true;
-                                    }
-                                    if (line.contains("curl") || line.contains("wget"))
-                                        && line.contains("| bash")
-                                    {
-                                        println!(
-                                            "[FAIL] Remote exec pattern in {}:{}",
-                                            path.display(),
-                                            i + 1
-                                        );
-                                        script_violation = true;
-                                    }
-                                    if line.contains("/tmp/") && line.contains("$$") {
-                                        println!(
-                                            "[FAIL] Predictable temp file with PID in {}:{}",
-                                            path.display(),
-                                            i + 1
-                                        );
-                                        script_violation = true;
-                                    }
-                                }
-                            }
-                        }
+            if !p.exists() {
+                continue;
+            }
+            if let Ok(entries) = fs::read_dir(&p) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.extension().map_or(false, |ext| ext == "sh" || ext == "zsh") {
+                        script_paths.push(path);
+                    }
+                }
+            }
+        }
+
+        for path in script_paths {
+            if path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n == "audit-security.sh")
+            {
+                continue;
+            }
+            if let Ok(content) = fs::read_to_string(&path) {
+                for (i, line) in content.lines().enumerate() {
+                    if line.contains("eval ") && !line.contains("Ignore/Safe") {
+                        println!("[FAIL] Unsafe eval in {}:{}", path.display(), i + 1);
+                        script_violation = true;
+                    }
+                    if (line.contains("curl") || line.contains("wget")) && line.contains("| bash")
+                    {
+                        println!(
+                            "[FAIL] Remote exec pattern in {}:{}",
+                            path.display(),
+                            i + 1
+                        );
+                        script_violation = true;
+                    }
+                    if line.contains("/tmp/") && line.contains("$$") {
+                        println!(
+                            "[FAIL] Predictable temp file with PID in {}:{}",
+                            path.display(),
+                            i + 1
+                        );
+                        script_violation = true;
                     }
                 }
             }

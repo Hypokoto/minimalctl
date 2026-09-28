@@ -65,9 +65,37 @@ impl SystemStatus {
         println!("=== MINIMAL DESKTOP STATUS ===");
         println!();
         println!("SESSION STATE");
-        println!("  Quickshell           ● Running");
-        println!("  Hypridle             ● Running");
-        println!("  awww-daemon          ● Running");
+        let uid_str = Command::new("id")
+            .arg("-u")
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .unwrap_or_default();
+        let uid = uid_str.trim();
+
+        for (label, proc) in [
+            ("labwc", "labwc"),
+            ("foot-server", "foot"),
+            ("mako", "mako"),
+            ("minclip", "minclip"),
+            ("minosd", "minosd"),
+            ("minbat", "minbat"),
+        ] {
+            let mut pgrep_cmd = Command::new("pgrep");
+            if !uid.is_empty() {
+                pgrep_cmd.args(["-u", uid]);
+            }
+            let running = pgrep_cmd
+                .args(["-x", proc])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+            println!(
+                "  {:<20} {}",
+                label,
+                if running { "● Running" } else { "○ Stopped" }
+            );
+        }
         println!();
         println!("LISTENING SOCKETS");
         println!("  Total                {}", self.sockets.total);

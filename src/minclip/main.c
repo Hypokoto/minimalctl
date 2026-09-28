@@ -351,7 +351,12 @@ int main(int argc, char *argv[]) {
     unlink(saddr.sun_path);
 
     app.sock_fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
-    bind(app.sock_fd, (struct sockaddr *)&saddr, sizeof(saddr));
+    if (app.sock_fd < 0 || bind(app.sock_fd, (struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
+        fprintf(stderr, "minclip: Failed to bind IPC socket\n");
+        wl_data_device_destroy(app.data_device);
+        wl_display_disconnect(app.display);
+        return 1;
+    }
     listen(app.sock_fd, 8);
 
     sigset_t mask;
