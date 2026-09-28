@@ -1,4 +1,3 @@
-# Rust build artifacts
+# Rust and C build artifacts
 /target/
 .codeql/
-/tools/minbat/minbat

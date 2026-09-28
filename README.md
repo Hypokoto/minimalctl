@@ -86,6 +86,17 @@ Dedicated security and networking aliases:
 
 ---
 
+## ⚡ Native C System Daemons (`src/`)
+
+Minimal replaces high-overhead shell daemon loops and external CLI wrappers with hyper-optimized, standalone native C daemons built with strict zero-subshell and zero-fork constraints:
+
+### 1. Zero-Wakeup Battery Daemon (`src/minbat/` -> `target/minbat`)
+- **Event Engine**: Listens on `PF_NETLINK` (`NETLINK_KOBJECT_UEVENT`) with `epoll_wait()` for true zero-CPU idle operation (0 wakeups while idle/AC).
+- **Fast Attribute Mapping**: Inspects `/sys/class/power_supply/BAT0/*` using memory-mapped attribute reads with safe sysfs fallback (<150μs latency).
+- **Direct D-Bus IPC**: Directly invokes `org.freedesktop.Notifications.Notify` via `sd_bus_call_method` with replaceable notification IDs. Completely eliminates `notify-send` fork overhead.
+
+---
+
 ## 📁 Repository Structure
 
 ```

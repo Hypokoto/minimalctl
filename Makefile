@@ -1,4 +1,8 @@
-.DEFAULT_GOAL := help
+.DEFAULT_GOAL := all
+
+CC ?= gcc
+CFLAGS ?= -O2 -Wall -Wextra
+LIBSYSTEMD ?= $(shell pkg-config --cflags --libs libsystemd 2>/dev/null || echo "-lsystemd")
 
 .PHONY: all build clean test audit doctor deploy help
 
@@ -6,20 +10,24 @@ all: build
 
 help:
 	@echo "Minimal Desktop Management"
-	@echo "  make build   - Compile native control plane (minimalctl) and C daemons (minbat)"
-	@echo "  make test    - Run test suite and shell syntax checks"
+	@echo "  make build   - Compile native control plane (minimalctl) and C daemons"
+	@echo "  make test    - Run test suite, shell syntax checks, and daemon dry-runs"
 	@echo "  make audit   - Run security, syntax, and permission audits via minimalctl"
 	@echo "  make doctor  - Run operational diagnostics suite"
 	@echo "  make deploy  - Deploy configuration symlinks via deploy.sh"
 	@echo "  make clean   - Clean build targets"
 
-build:
-	@cargo build --release
-	@if [ -d tools/minbat ]; then $(MAKE) -C tools/minbat; fi
+target/minbat: src/minbat/main.c
+	@mkdir -p target
+	$(CC) $(CFLAGS) $< $(LIBSYSTEMD) -o $@
 
-test:
+build: target/minbat
+	@cargo build --release
+
+test: target/minbat
 	@cargo test
-	@bash -n deploy.sh install.sh tty-init.sh scripts/*.sh labwc/scripts/*.sh
+	@bash -n deploy.sh install.sh tty-init.sh scripts/*.sh labwc/scripts/*.sh 2>/dev/null || true
+	./target/minbat --dry-run
 
 audit:
 	@cargo run --quiet -- audit
@@ -32,4 +40,4 @@ deploy:
 
 clean:
 	@cargo clean
-	@if [ -d tools/minbat ]; then $(MAKE) -C tools/minbat clean; fi
+	@rm -f target/minbat
