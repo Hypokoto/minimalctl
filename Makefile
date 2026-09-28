@@ -2,6 +2,8 @@
 
 .PHONY: all build clean test audit doctor deploy help
 
+all: build
+
 help:
 	@echo "Minimal Desktop Management"
 	@echo "  make build   - Compile native control plane (minimalctl) and C daemons (minbat)"
