@@ -35,7 +35,7 @@ impl AuditReport {
             if let Ok(entries) = fs::read_dir(&p) {
                 for entry in entries.flatten() {
                     let path = entry.path();
-                    if path.extension().map_or(false, |ext| ext == "sh" || ext == "zsh") {
+                    if path.extension().is_some_and(|ext| ext == "sh" || ext == "zsh") {
                         script_paths.push(path);
                     }
                 }

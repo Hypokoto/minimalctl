@@ -14,7 +14,9 @@ PALETTE_H := src/minosd/palette.h
 palette: $(PALETTE_H)
 
 $(PALETTE_H):
-	@# Static palette header maintained in src/minosd/palette.h
+	@if [ -f themes/synthwave.toml ] && [ -f scripts/gen-palette.sh ]; then \
+		bash scripts/gen-palette.sh themes/synthwave.toml $(PALETTE_H); \
+	fi
 
 all: build
 
@@ -48,11 +50,13 @@ build: $(DAEMONS)
 
 test: $(DAEMONS)
 	@cargo test
-	@bash -n deploy.sh install.sh tty-init.sh scripts/*.sh labwc/scripts/*.sh 2>/dev/null || true
+	@bash -n deploy.sh install.sh tty-init.sh scripts/*.sh labwc/scripts/*.sh
 	./target/minbat --dry-run
-	./target/minosd --dry-run
-	./target/minclip --dry-run
-	./target/mincore --dry-run
+	@if [[ -n "$${WAYLAND_DISPLAY:-}" && -n "$${XDG_RUNTIME_DIR:-}" ]]; then \
+		./target/minosd --dry-run && ./target/minclip --dry-run && ./target/mincore --dry-run; \
+	else \
+		echo "Skipping Wayland dry-runs: no Wayland session detected."; \
+	fi
 
 audit:
 	@cargo run --quiet -- audit

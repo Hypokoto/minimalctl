@@ -332,7 +332,7 @@ int main(int argc, char *argv[]) {
     app.display = wl_display_connect(NULL);
     if (!app.display) {
         fprintf(stderr, "minosd: Failed to connect to Wayland display\n");
-        return dry_run ? 0 : 1;
+        return 1;
     }
 
     struct wl_registry *registry = wl_display_get_registry(app.display);
@@ -342,7 +342,7 @@ int main(int argc, char *argv[]) {
     if (!app.compositor || !app.shm || !app.layer_shell) {
         fprintf(stderr, "minosd: Missing required Wayland interfaces\n");
         wl_display_disconnect(app.display);
-        return dry_run ? 0 : 1;
+        return 1;
     }
 
     if (init_shm_buffer(&app) < 0) {

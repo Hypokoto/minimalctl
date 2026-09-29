@@ -3,11 +3,19 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+fn require_success(status: std::io::Result<std::process::ExitStatus>, label: &str) {
+    match status {
+        Ok(status) if status.success() => {}
+        Ok(status) => panic!("{} failed with exit status: {}", label, status),
+        Err(error) => panic!("failed to run {}: {}", label, error),
+    }
+}
+
 fn main() {
     println!("cargo:rerun-if-changed=src/minbat/main.c");
     println!("cargo:rerun-if-changed=src/minosd/main.c");
+    println!("cargo:rerun-if-changed=src/minosd/palette.h");
     println!("cargo:rerun-if-changed=src/minclip/main.c");
-    println!("cargo:rerun-if-changed=themes/synthwave.toml");
     println!("cargo:rerun-if-changed=scripts/gen-palette.sh");
 
     let manifest_dir = match env::var("CARGO_MANIFEST_DIR") {
@@ -40,12 +48,12 @@ fn main() {
     let minbat_src = Path::new(&manifest_dir).join("src/minbat/main.c");
     if minbat_src.exists() {
         let out_bin = target_dir.join("minbat");
-        let _ = Command::new(compiler.path())
-            .args(&["-O2", "-Wall", "-Wextra"])
+        require_success(Command::new(compiler.path())
+            .args(["-O2", "-Wall", "-Wextra"])
             .arg(&minbat_src)
-            .args(&["-lsystemd", "-o"])
+            .args(["-lsystemd", "-o"])
             .arg(&out_bin)
-            .status();
+            .status(), "minbat compilation");
     }
 
     // 2. minosd
@@ -55,26 +63,26 @@ fn main() {
         let minosd_dir = Path::new(&manifest_dir).join("src/minosd");
         let proto_layer = minosd_dir.join("wlr-layer-shell-unstable-v1-protocol.c");
         let proto_xdg = minosd_dir.join("xdg-shell-protocol.c");
-        let _ = Command::new(compiler.path())
-            .args(&["-O2", "-Wall", "-Wextra", "-Isrc/minosd", "-I/usr/include/pixman-1"])
+        require_success(Command::new(compiler.path())
+            .args(["-O2", "-Wall", "-Wextra", "-Isrc/minosd", "-I/usr/include/pixman-1"])
             .arg(&minosd_src)
             .arg(&proto_layer)
             .arg(&proto_xdg)
-            .args(&["-lwayland-client", "-lpixman-1", "-lm", "-o"])
+            .args(["-lwayland-client", "-lpixman-1", "-lm", "-o"])
             .arg(&out_bin)
-            .status();
+            .status(), "minosd compilation");
     }
 
     // 3. minclip
     let minclip_src = Path::new(&manifest_dir).join("src/minclip/main.c");
     if minclip_src.exists() {
         let out_bin = target_dir.join("minclip");
-        let _ = Command::new(compiler.path())
-            .args(&["-O2", "-Wall", "-Wextra"])
+        require_success(Command::new(compiler.path())
+            .args(["-O2", "-Wall", "-Wextra"])
             .arg(&minclip_src)
-            .args(&["-lwayland-client", "-o"])
+            .args(["-lwayland-client", "-o"])
             .arg(&out_bin)
-            .status();
+            .status(), "minclip compilation");
     }
 
     // 4. mincore (unified multi-call binary)
@@ -85,7 +93,7 @@ fn main() {
         let proto_layer = minosd_dir.join("wlr-layer-shell-unstable-v1-protocol.c");
         let proto_xdg = minosd_dir.join("xdg-shell-protocol.c");
         let status = Command::new(compiler.path())
-            .args(&[
+            .args([
                 "-O2",
                 "-Wall",
                 "-Wextra",
@@ -99,7 +107,7 @@ fn main() {
             .arg(&proto_layer)
             .arg(&proto_xdg)
             .arg(&minclip_src)
-            .args(&["-lsystemd", "-lwayland-client", "-lpixman-1", "-lm", "-o"])
+            .args(["-lsystemd", "-lwayland-client", "-lpixman-1", "-lm", "-o"])
             .arg(&out_bin)
             .status();
 

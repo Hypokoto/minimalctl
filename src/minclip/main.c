@@ -320,7 +320,7 @@ int main(int argc, char *argv[]) {
     app.display = wl_display_connect(NULL);
     if (!app.display) {
         fprintf(stderr, "minclip: Failed to connect to Wayland display\n");
-        return dry_run ? 0 : 1;
+        return 1;
     }
 
     app.registry = wl_display_get_registry(app.display);
@@ -330,7 +330,7 @@ int main(int argc, char *argv[]) {
     if (!app.seat || !app.data_device_mgr) {
         fprintf(stderr, "minclip: Missing wl_seat or wl_data_device_manager\n");
         wl_display_disconnect(app.display);
-        return dry_run ? 0 : 1;
+        return 1;
     }
 
     app.data_device = wl_data_device_manager_get_data_device(app.data_device_mgr, app.seat);

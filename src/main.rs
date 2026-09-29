@@ -7,13 +7,19 @@ use clap::{Parser, Subcommand};
 use doctor::DoctorReport;
 use status::SystemStatus;
 use std::fs;
-use std::path::{PathBuf};
+use std::path::PathBuf;
+
+fn is_repo_root(path: &std::path::Path) -> bool {
+    path.join("labwc").is_dir()
+        && path.join("packages").is_dir()
+        && path.join("Cargo.toml").is_file()
+}
 
 fn find_repo_root() -> PathBuf {
     // 1. Search upwards from current working directory
     if let Ok(mut curr) = std::env::current_dir() {
         loop {
-            if curr.join("labwc").exists() && curr.join("themes").exists() {
+            if is_repo_root(&curr) {
                 return curr;
             }
             if !curr.pop() {
@@ -29,7 +35,7 @@ fn find_repo_root() -> PathBuf {
         if let Ok(canonical_exe) = fs::canonicalize(&exe_path) {
             let mut curr = canonical_exe;
             while curr.pop() {
-                if curr.join("labwc").exists() && curr.join("themes").exists() {
+                if is_repo_root(&curr) {
                     return curr;
                 }
             }
@@ -39,7 +45,7 @@ fn find_repo_root() -> PathBuf {
     // 3. Fallback to standard dotfiles home location (~/minimal)
     if let Ok(home) = std::env::var("HOME") {
         let minimal_dir = PathBuf::from(&home).join("minimal");
-        if minimal_dir.join("themes").exists() {
+        if is_repo_root(&minimal_dir) {
             return minimal_dir;
         }
     }
