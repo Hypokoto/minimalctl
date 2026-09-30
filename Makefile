@@ -11,12 +11,6 @@ PALETTE_H := src/minosd/palette.h
 
 .PHONY: all build clean test audit doctor deploy help palette $(DAEMONS)
 
-palette: $(PALETTE_H)
-
-$(PALETTE_H):
-	@if [ -f themes/synthwave.toml ] && [ -f scripts/gen-palette.sh ]; then \
-		bash scripts/gen-palette.sh themes/synthwave.toml $(PALETTE_H); \
-	fi
 
 all: build
 

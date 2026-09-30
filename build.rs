@@ -16,29 +16,12 @@ fn main() {
     println!("cargo:rerun-if-changed=src/minosd/main.c");
     println!("cargo:rerun-if-changed=src/minosd/palette.h");
     println!("cargo:rerun-if-changed=src/minclip/main.c");
-    println!("cargo:rerun-if-changed=scripts/gen-palette.sh");
 
     let manifest_dir = match env::var("CARGO_MANIFEST_DIR") {
         Ok(dir) => dir,
         Err(_) => return,
     };
 
-    let palette_h = Path::new(&manifest_dir).join("src/minosd/palette.h");
-    let synthwave_toml = Path::new(&manifest_dir).join("themes/synthwave.toml");
-    if synthwave_toml.exists() {
-        let status = Command::new("bash")
-            .args([
-                "scripts/gen-palette.sh",
-                "themes/synthwave.toml",
-                palette_h.to_str().unwrap_or("src/minosd/palette.h"),
-            ])
-            .current_dir(&manifest_dir)
-            .status()
-            .expect("Failed to execute scripts/gen-palette.sh");
-        if !status.success() {
-            panic!("scripts/gen-palette.sh failed with exit code: {}", status);
-        }
-    }
     let target_dir = Path::new(&manifest_dir).join("target");
     let _ = fs::create_dir_all(&target_dir);
 

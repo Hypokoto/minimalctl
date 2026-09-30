@@ -80,25 +80,14 @@ impl DoctorReport {
             fail += 1;
         }
 
-        // 6. Theme Source Definition (optional or standalone)
-        let synthwave_path = root.join("themes/synthwave.toml");
-        if synthwave_path.exists() {
-            let theme_ok = if let Ok(content) = fs::read_to_string(&synthwave_path) {
-                content.parse::<toml::Value>().map(|v| v.get("tokens").is_some()).unwrap_or(false)
-            } else {
-                false
-            };
-
-            if theme_ok {
-                println!("[PASS] Theme source definition (synthwave.toml valid)");
-                pass += 1;
-            } else {
-                println!("[FAIL] Theme source definition invalid (themes/synthwave.toml)");
-                fail += 1;
-            }
-        } else {
-            println!("[PASS] Theme system: standalone static configurations (themes directory omitted)");
+        // 6. Theme Source Definition (Standalone)
+        let palette_path = root.join("src/minosd/palette.h");
+        if palette_path.exists() {
+            println!("[PASS] Theme system: standalone static configurations (palette.h exists)");
             pass += 1;
+        } else {
+            println!("[FAIL] Theme system missing: src/minosd/palette.h not found");
+            fail += 1;
         }
 
         // 7. Desktop Target Configurations Integrity
