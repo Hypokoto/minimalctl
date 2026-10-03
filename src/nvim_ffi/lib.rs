@@ -1,6 +1,7 @@
 use std::os::raw::c_void;
 use std::thread;
 use std::time::Duration;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 // libuv symbols exposed by Neovim
 extern "C" {
@@ -22,16 +23,28 @@ pub struct UvAsync {
     _data: [u8; 256],
 }
 
-// Global async handle.
+// Global state
 static mut ASYNC_HANDLE: UvAsync = UvAsync { _data: [0; 256] };
 static mut LUA_CALLBACK: Option<extern "C" fn()> = None;
 static mut INITIALIZED: bool = false;
+static SHUTDOWN_FLAG: AtomicBool = AtomicBool::new(false);
+static mut WORKER_THREAD: Option<thread::JoinHandle<()>> = None;
 
 extern "C" fn async_cb(_handle: *mut c_void) {
     // This runs on Neovim's main thread!
     unsafe {
         if let Some(cb) = LUA_CALLBACK {
             cb();
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn minimal_nvim_shutdown() {
+    SHUTDOWN_FLAG.store(true, Ordering::SeqCst);
+    unsafe {
+        if let Some(handle) = std::ptr::replace(&raw mut WORKER_THREAD, None) {
+            let _ = handle.join();
         }
     }
 }
@@ -45,6 +58,7 @@ pub extern "C" fn minimal_nvim_init(cb: extern "C" fn()) -> i32 {
         }
 
         LUA_CALLBACK = Some(cb);
+        SHUTDOWN_FLAG.store(false, Ordering::SeqCst);
 
         let loop_ptr = &raw mut main_loop as *mut c_void;
 
@@ -58,16 +72,16 @@ pub extern "C" fn minimal_nvim_init(cb: extern "C" fn()) -> i32 {
         let async_ptr_val = async_ptr as usize;
 
         // Spawn a background thread to simulate external IPC trigger (Tracer Bullet)
-        thread::spawn(move || {
+        WORKER_THREAD = Some(thread::spawn(move || {
             let async_ptr = async_ptr_val as *mut c_void;
-            for _ in 0..3 { // Shutdown after 3 pings so thread terminates safely for testing
+            while !SHUTDOWN_FLAG.load(Ordering::SeqCst) {
                 thread::sleep(Duration::from_secs(2));
+                if SHUTDOWN_FLAG.load(Ordering::SeqCst) { break; }
+
                 // Ping Neovim main thread!
-                unsafe {
-                    uv_async_send(async_ptr);
-                }
+                uv_async_send(async_ptr);
             }
-        });
+        }));
 
         0
     }
