@@ -17,6 +17,11 @@ similar = "2.4"
 name = "minimalctl"
 path = "src/main.rs"
 
+[lib]
+name = "minimal_nvim"
+path = "src/nvim_ffi/lib.rs"
+crate-type = ["cdylib"]
+
 [[bin]]
 name = "minimal-ide"
 path = "src/ide/main.rs"
