@@ -118,19 +118,14 @@ fn main() {
                 eprintln!("[minimal-ide] watcher start failed: {e}");
             }
 
-            // Spawn background thread to recompute diffs on file change
-            let _watcher_thread = std::thread::spawn(move || {
-                for _event in watcher_rx {
-                    // Events forwarded; server.recompute_diffs() called from RPC thread
-                }
-            });
-
             if stdio || socket.is_none() {
-                if let Err(e) = server.run_stdio() {
+                if let Err(e) = server.run_stdio(watcher_rx) {
                     eprintln!("[minimal-ide] stdio error: {e}");
                     std::process::exit(1);
                 }
             } else if let Some(sock_path) = socket {
+                // Socket transport does not consume watcher events yet (see docs/roadmap.md).
+                let _watcher_thread = std::thread::spawn(move || for _event in watcher_rx {});
                 if let Err(e) = server.run_socket(&sock_path) {
                     eprintln!("[minimal-ide] socket error: {e}");
                     std::process::exit(1);
