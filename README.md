@@ -1,88 +1,56 @@
-# Minimal Dotfiles
+# Minimal Dotfiles & Terminal-Native Neovim IDE
 
-Modular, high-performance Linux desktop environment architecture built for labwc, Neovim (NvChad), Quickshell, and an AI-native Zsh terminal workspace. Features a refined, ultra-fast Quickshell presentation layer, native Rust theme control plane (`minimalctl`), Hyprtasking workspace overview, and hy3 tabbed window grouping.
+Minimal is an Arch Linux dotfiles repository for a Hyprland-based desktop, featuring a native C/Rust control plane and a tightly integrated **Terminal-Native Neovim IDE**.
 
----
+## Terminal-Native Neovim IDE
 
-## 📚 Documentation & User Guides
+The **Terminal-Native Neovim IDE** provides the modern, agentic development workflow of VS Code and Google Antigravity while retaining **Neovim** as the high-speed, keyboard-driven text editor.
 
-- 📖 **[User Guide](docs/user-guide.md)** — Keybindings, Workspaces, Launchers, Window Rescue, Game Mode, Night Light, Screen OCR, Theme Switching.
-- 🏗️ **[System Architecture](docs/architecture.md)** — Rust `minimalctl` control plane, atomic writes, zero-drift FNV-1a content hash engine.
-- ⌨️ **[Keybindings Reference](docs/keybindings.md)** — Complete Vim spatial navigation & shortcut cheat sheet.
-- 🩺 **[Troubleshooting Guide](docs/troubleshooting.md)** — Operational diagnostics (`minimalctl doctor`), verification, and emergency window recovery.
+### Architecture
 
----
+Unlike plugins that attempt to run an AI agent inside Neovim or bind to specific vendor APIs, this system adheres to a **strict decoupling principle**:
+- **External CLI Agents** (Codex, Claude Code, Gemini CLI, Aider, custom scripts) run as independent processes in standard PTY terminals.
+- **The Workspace Filesystem & Git Repository** serve as the common ground of truth.
+- **The Rust IDE Core Sidecar (`minimal-ide`)** runs asynchronously alongside Neovim, observing filesystem changes, maintaining snapshot baselines, calculating structured diffs, and attributing modifications between user and agent.
+- **The Neovim Plugin (`ide.nvim`)** acts as the presentation layer, rendering animated diff transitions, floating change reviews, and atomic accept/reject operations directly within the editor.
 
-## 🚀 Quick Start & Deployment
+### Installation
 
-```bash
-git clone https://github.com/Hypokoto/minimal.git ~/minimal
-cd ~/minimal
-./install.sh
-```
-
-- **`install.sh`**: Multi-distro package installer with distro detection (`pacman`/`apt`/`dnf`/`brew`). On Arch Linux (primary target), installs system binaries, fonts, services, and toolchains via `pacman` + `yay` (AUR). On other distros, skips system package installation but still deploys dotfiles via `deploy.sh`.
-- **`deploy.sh`**: Idempotent deployment pipeline for user dotfiles. Performs binary presence verification, palette target compilation (`minimalctl theme apply obsidian`), atomic symlinking, NvChad custom overlaying, and font cache refreshes (`fc-cache -fv`). Logged to `~/.local/state/minimal-deploy.log`.
-
----
-
-## 🎨 Single-Source-of-Truth Theme Engine (`minimalctl`)
-
-`themes/*.toml` (e.g. `themes/obsidian.toml`) and the `minimalctl` native Rust control plane serve as the **single source of truth** for all desktop color palettes and theme targets.
+The system is deployed via the standard Minimal installer:
 
 ```bash
-# Build & apply theme transaction across all running components live:
-minimalctl theme apply [theme]
-
-# Verify theme definition and check for target drift:
-minimalctl theme verify
-
-# Run operational diagnostics suite:
-minimalctl doctor
+# Redeploy symlinks and install IDE binaries
+./deploy.sh
 ```
 
-`minimalctl theme apply` compiles 1 canonical source (`themes/*.toml`) into 7 active runtime targets live without logging out or killing session states:
-- `labwc/hypr/colors.conf` — labwc `$variable` definitions (reloaded live via `hyprctl`)
-- `common/kitty/kitty.conf` — Terminal palette & chrome (reloaded live via `SIGUSR1`)
-- `common/btop/btop.theme` — btop TUI color table
-- `common/starship/starship.toml` — Starship shell prompt (reloaded live on next prompt)
-- `common/tmux/tmux.conf` & `~/.tmux.conf` — Tmux status bar & pane borders (reloaded live via `tmux source-file` + `tmux refresh-client`)
-- `common/nvim/lua/themes/minimal.lua` — Neovim NvChad Base46 theme
-- `~/.config/quickshell/theme.json` — Quickshell presentation layer (reloaded live via `quickshell ipc call minimal-shell reloadTheme`)
+This installs `minimal-ide` to `~/.local/bin/minimal-ide` and injects the Neovim plugin into `~/.config/nvim`.
 
----
+### Configuration
 
-## 🐚 Quickshell Presentation Layer (`quickshell/`)
+Configuration is managed via TOML. Example configuration elements include:
 
-Minimal replaces legacy bar and menu daemons with a unified, lightweight Quickshell layer (`shell.qml`):
-- **Top Bar (`Bar.qml`)**: Workspaces, window title, sys-tray, network, audio, volume, battery, and clock.
-- **App Launcher (`LauncherWindow.qml`)**: 5-column grid app launcher with freedesktop icon evaluation, fuzzy search, and right-click context menu (Open / Pin / Unpin).
-- **Clipboard History Manager (`ClipboardWindow.qml`)**: Quickshell clipboard overlay backed by `cliphist` + `wl-clipboard` featuring fuzzy search, text & image previews, item deletion, and clear history (`SUPER + X`).
-- **Control Center (`ControlCenterWindow.qml`)**: Quick toggles for Wi-Fi, Bluetooth, Audio, Brightness, Game Mode, Night Light, and System Usage graphs (`SUPER + N`).
-- **Workspace Overview (`Hyprtasking`)**: 3x3 interactive workspace grid overview (`SUPER + T` / `SUPER + ~`).
-- **Session Menu (`SidebarWindow.qml`)**: Power menu overlay for shutdown, reboot, suspend, lock, and logout (`SUPER + Escape`).
+```toml
+[diff]
+animation = true
+animation_duration_ms = 180
+```
 
----
+### Supported Agents
 
-## 🛠️ Zsh Subsystem (`zsh/`)
+Any CLI agent that modifies the filesystem will work out of the box. Pre-configured presets include:
+- `codex`
+- `claude`
+- `gemini`
+- `aider`
 
-The Zsh shell environment is configured as a guarded, high-performance workspace:
+### Development
 
-### 1. Defensive Alias Architecture (`common/zsh/aliases.zsh`)
-Every binary alias is wrapped in a `command -v <tool> >/dev/null 2>&1` check to guarantee that the shell never breaks if a package is uninstalled:
-- **Listing**: `ls`, `ll`, `la`, `l`, `lt`, `llt` → `eza` (with git & icon support)
-- **File Viewing**: `cat`, `batp` → `bat` (syntax highlighting pager)
-- **Disk Usage**: `df` → `duf`, `du` → `dust`
-- **System Monitoring**: `top` → `btop`
-- **Search**: `grep` → `ripgrep` (`rg`), `find` → `fd`
-- **Safe Deletion**: `rm`, `tp`, `tl`, `tr` → `trash-cli` / `trash-put` (with `rmf` for raw `/bin/rm -iv`)
-- **Navigation & Reloader**: `..`, `...`, `....`, `-`, `reload`, `ezsh`, `ealias`
+The IDE is built in Rust (the sidecar) and Lua (the Neovim plugin). See the `docs/` directory for detailed architecture, protocol, and configuration specifications.
 
-### 2. Rust Security & Networking Layer (`common/zsh/sec.zsh`)
-Dedicated security and networking aliases:
-- **Recon & Fuzzing**: `rustscan` (fast Nmap hand-off) and `feroxbuster` (web content discovery).
-- **Monitoring & Discovery**: `sniffnet` (TUI traffic monitor), `bandwhich`, `trippy` (traceroute), and `netscanner` (ARP LAN discovery).
-- **Analysis**: `hexyl` (hex viewer) and `cargo-audit` (RustSec CVE scanner).
+### Limitations & Roadmap
+- Currently supports atomic file modifications and diff visualization.
+- Future roadmap includes parallel sessions, advanced conflict handling, and persistent workspace state.
+- See `docs/roadmap.md` for details.
 
 ---
 
@@ -90,143 +58,17 @@ Dedicated security and networking aliases:
 
 Minimal replaces high-overhead shell daemon loops and external CLI wrappers with hyper-optimized, standalone native C daemons built with strict zero-subshell and zero-fork constraints:
 
-### 1. Zero-Wakeup Battery Daemon (`src/minbat/` -> `target/minbat`)
-- **Event Engine**: Listens on `PF_NETLINK` (`NETLINK_KOBJECT_UEVENT`) with `epoll_wait()` for true zero-CPU idle operation (0 wakeups while idle/AC).
-- **Fast Attribute Mapping**: Inspects `/sys/class/power_supply/BAT0/*` using memory-mapped attribute reads with safe sysfs fallback (<150μs latency).
-- **Direct D-Bus IPC**: Directly invokes `org.freedesktop.Notifications.Notify` via `sd_bus_call_method` with replaceable notification IDs. Completely eliminates `notify-send` fork overhead.
+### 1. Zero-Wakeup Battery Daemon (`src/minbat/`)
+- Listens on `PF_NETLINK` for true zero-CPU idle operation.
 
-### 2. Wayland Layer-Shell OSD Overlay (`src/minosd/` -> `target/minosd`)
-- **Protocol Integration**: Wayland `zwlr_layer_shell_v1` on `ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY`, anchored bottom.
-- **Hardware-Synced Synthwave Pill**: Renders `#14B9B5` (Electric Cyan) active progress bar on `#0E091D` acrylic pill via `pixman` with 12px pill rounding and vblank frame synchronization (`wl_surface.frame`).
-- **Zero-Latency Datagram Socket**: Listens on `/run/user/<uid>/minosd.sock` for 2-byte datagrams (`V+5`, `V-5`, `VM`, `B+10`, `B-10`), with auto-fade / surface unmapping after 1.2s.
+### 2. Wayland Layer-Shell OSD Overlay (`src/minosd/`)
+- Renders progress bars on a Wayland layer surface via `pixman` with 12px rounding.
 
-### 3. In-Memory Wayland Clipboard Ring (`src/minclip/` -> `target/minclip`)
-- **Direct Protocol Listener**: Implements Wayland `wl_data_device_manager` directly without `wl-paste` or `cliphist` subshells.
-- **50-Entry In-Memory Ring**: Zero disk I/O, deduplicated in-memory ring buffer with non-blocking pipes.
-- **Fuzzel & IPC Integration**: Socket server on `/run/user/<uid>/minclip.sock` supporting `minclip --list` stdout dumping and `minclip --copy <id>` clipboard restoration.
-- **Privacy Wipe**: Clears clipboard history immediately upon receiving `SIGUSR1` from screen locker.
-
----
+### 3. In-Memory Wayland Clipboard Ring (`src/minclip/`)
+- Implements Wayland `wl_data_device_manager` directly with zero disk I/O.
 
 ## 📁 Repository Structure
-
-```
-minimal/
-├── install.sh                     # Arch system setup script (pacman + yay + deploy)
-├── deploy.sh                      # Idempotent symlinker & NvChad overlay pipeline
-├── LICENSE                        # GNU General Public License v3.0
-├── README.md                      # Repository documentation
-├── Cargo.toml / src/              # minimalctl native Rust control plane
-├── btop/
-│   └── btop.theme                 # Compiled from themes/*.toml
-├── fastfetch/
-│   └── config.jsonc               # Fastfetch system info layout
-├── git/
-│   └── config                     # Git & delta syntax pager configuration
-├── hypr/
-│   ├── labwc.lua               # Core labwc compositor entry point (Lua)
-│   ├── keybinds.lua               # Global keybindings & media pipeline (Lua)
-│   ├── monitors.lua               # Display rules & monitor topology (Lua)
-│   └── wallpaper/                 # Wallpaper picker & daemon scripts
-├── kitty/
-│   └── kitty.conf                 # Terminal config & compiled colors
-├── nvim/
-│   ├── ftplugin/java.lua          # Prioritized JDK 21 OpenJDK discovery logic
-│   ├── lua/chadrc.lua             # NvChad entry point
-│   └── lua/themes/minimal.lua    # Base46 theme compiled from themes/*.toml
-├── quickshell/
-│   ├── shell.qml                  # Main IPC entry point & service initialization
-│   ├── modules/
-│   │   ├── bar/Bar.qml            # Top bar component
-│   │   ├── launcher/              # Grid launcher component
-│   │   ├── clipboard/             # Clipboard history manager component
-│   │   ├── controlcenter/        # Quick settings control center
-│   │   └── osd/                   # OSD volume and brightness overlays
-│   └── services/                  # Quickshell singletons (CliphistService, Pywal, etc.)
-├── starship/
-│   └── starship.toml              # Starship prompt configuration
-├── themes/
-│   ├── obsidian.toml              # Default dark cyan/void theme source
-│   ├── gruvbox.toml
-│   ├── synthwave.toml
-│   ├── catpuccin.toml
-│   └── ayu-dark.toml
-├── tmux/
-│   └── tmux.conf                  # Tmux terminal multiplexer configuration
-├── yazi/
-│   └── yazi.toml                  # Yazi file manager configuration
-└── zsh/
-    ├── .zshrc                     # Main Zsh configuration
-    └── aliases.zsh                # Defensive guarded CLI aliases module
-```
-
----
-
-## ⌨️ Keybindings Quick Reference
-
-| Key Combo | Action | Component |
-|---|---|---|
-| `SUPER + Return` | Launch Kitty terminal | Terminal |
-| `SUPER + Space` | Toggle Quickshell App Grid Launcher | Launcher |
-| `SUPER + X` | Toggle Quickshell Clipboard Manager | Clipboard |
-| `SUPER + N` | Toggle Quickshell Control Center | Quick Settings |
-| `SUPER + T` / `SUPER + ~` | Toggle Hyprtasking 3x3 workspace grid overview | Workspaces |
-| `SUPER + G` | Toggle labwc window tabbed grouping (`hy3`) | Windows |
-| `SUPER + Q` | Close active window | Window Control |
-| `SUPER + F` | Toggle fullscreen window mode | Window Control |
-| `SUPER + B` | Toggle Quickshell Top Bar | Bar |
-| `SUPER + Escape` | Toggle Quickshell Session / Power menu | Session |
-| `SUPER + ALT + Escape` | Lock screen (`hyprlock`) | Security |
-| `SUPER + SHIFT + G` | Toggle Game Mode (disable blur/animations) | Performance |
-| `SUPER + SHIFT + X` | Screen OCR text extractor to clipboard | Utilities |
-
----
-
-## 🔒 Contributing — Security Checks Before Every Commit
-
-This repo enforces security scanning and code quality at the git hook level via **pre-commit** and **gitleaks**. All contributors must install these hooks before making their first commit.
-
-### One-time setup
-
-```bash
-# 1. Install pre-commit (Arch)
-sudo pacman -S python-pre-commit
-
-# or with pip
-pip install pre-commit
-
-# 2. Install the git hooks into this repo
-pre-commit install
-
-# 3. (Optional) Run against all files immediately to check your working tree
-pre-commit run --all-files
-```
-
-### What runs on every `git commit`
-
-| Hook | Purpose |
-|------|---------|
-| `trailing-whitespace` | Strips trailing whitespace |
-| `end-of-file-fixer` | Ensures files end with a newline |
-| `check-yaml` / `check-toml` | Validates config syntax |
-| `check-added-large-files` | Blocks accidental binary blobs |
-| `rustfmt` | Enforces Rust formatting |
-| `clippy` | Rust lints and correctness checks |
-| **`gitleaks`** | Scans staged changes for secrets, API keys, tokens |
-| `semgrep` | Static analysis for code security patterns |
-
-### Gitleaks
-
-[gitleaks](https://github.com/gitleaks/gitleaks) runs automatically via pre-commit. It will **block the commit** if it detects a secret. To run it manually:
-
-```bash
-# Scan the full repo (no git history)
-gitleaks detect --source . --no-git --config .gitleaks.toml
-
-# Scan git history
-gitleaks detect --config .gitleaks.toml
-```
-
-The [`.gitleaks.toml`](.gitleaks.toml) allowlist suppresses known false positives (SHA-256 content hashes in `graphify-out/`). If you hit a false positive on a new pattern, add it to the allowlist with a clear comment explaining what it is.
-
-> **Never bypass with `git commit --no-verify`** unless you have explicitly confirmed with the lead that the flagged content is a false positive and documented it in `.gitleaks.toml`.
+- `docs/` - IDE architecture and design documentation
+- `src/ide/` - Rust source for `minimal-ide` sidecar
+- `nvim/lua/ide/` - Neovim Lua plugin
+- `hypr/` - Hyprland window manager configurations
