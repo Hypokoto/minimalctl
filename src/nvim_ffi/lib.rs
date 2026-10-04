@@ -3,6 +3,10 @@ use std::thread;
 use std::time::Duration;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+#[path = "../ipc_shm.rs"]
+pub mod ipc_shm;
+use ipc_shm::ShmBuffer;
+
 // libuv symbols exposed by Neovim
 extern "C" {
     fn uv_async_init(
@@ -16,8 +20,6 @@ extern "C" {
     static mut main_loop: c_void;
 }
 
-// Opaque struct for uv_async_t (must be large enough to hold libuv's uv_async_t).
-// In libuv, uv_async_t is usually around 128 bytes. We allocate 256 just to be safe.
 #[repr(C, align(8))]
 pub struct UvAsync {
     _data: [u8; 256],
@@ -30,9 +32,22 @@ static mut INITIALIZED: bool = false;
 static SHUTDOWN_FLAG: AtomicBool = AtomicBool::new(false);
 static mut WORKER_THREAD: Option<thread::JoinHandle<()>> = None;
 
+// For the C-API to read the latest state
+static mut LATEST_SHM: Option<ShmBuffer> = None;
+static mut LATEST_SEQ: u64 = 0;
+static mut LATEST_BYTES: Vec<u8> = Vec::new();
+
 extern "C" fn async_cb(_handle: *mut c_void) {
     // This runs on Neovim's main thread!
     unsafe {
+        // We pull the latest payload inside the main thread to avoid race conditions with Lua reading it
+        if let Some(shm) = &LATEST_SHM {
+            if let Some((new_seq, bytes)) = shm.read_payload(LATEST_SEQ) {
+                LATEST_SEQ = new_seq;
+                LATEST_BYTES = bytes;
+            }
+        }
+
         if let Some(cb) = LUA_CALLBACK {
             cb();
         }
@@ -60,6 +75,14 @@ pub extern "C" fn minimal_nvim_init(cb: extern "C" fn()) -> i32 {
         LUA_CALLBACK = Some(cb);
         SHUTDOWN_FLAG.store(false, Ordering::SeqCst);
 
+        // Open SHM Buffer
+        let shm_result = ShmBuffer::open_read_only();
+        if let Ok(shm) = shm_result {
+            LATEST_SHM = Some(shm);
+        } else {
+            return -2; // Failed to open SHM
+        }
+
         let loop_ptr = &raw mut main_loop as *mut c_void;
 
         let async_ptr = &raw mut ASYNC_HANDLE as *mut UvAsync as *mut c_void;
@@ -71,18 +94,48 @@ pub extern "C" fn minimal_nvim_init(cb: extern "C" fn()) -> i32 {
         INITIALIZED = true;
         let async_ptr_val = async_ptr as usize;
 
-        // Spawn a background thread to simulate external IPC trigger (Tracer Bullet)
         WORKER_THREAD = Some(thread::spawn(move || {
             let async_ptr = async_ptr_val as *mut c_void;
-            while !SHUTDOWN_FLAG.load(Ordering::SeqCst) {
-                thread::sleep(Duration::from_secs(2));
-                if SHUTDOWN_FLAG.load(Ordering::SeqCst) { break; }
+            let mut local_seq = 0;
+            // We need our own shm instance in the background thread for polling
+            let shm = ShmBuffer::open_read_only().unwrap();
 
-                // Ping Neovim main thread!
-                uv_async_send(async_ptr);
+            while !SHUTDOWN_FLAG.load(Ordering::SeqCst) {
+                thread::sleep(Duration::from_millis(50));
+
+                // Poll for changes
+                if let Some((new_seq, _)) = shm.read_payload(local_seq) {
+                    local_seq = new_seq;
+                    unsafe {
+                        uv_async_send(async_ptr);
+                    }
+                }
             }
         }));
 
+        0
+    }
+}
+
+// Zero-Copy C API for LuaJIT
+#[no_mangle]
+pub extern "C" fn minimal_nvim_get_total_additions() -> u32 {
+    unsafe {
+        if LATEST_BYTES.is_empty() { return 0; }
+        if let Ok(state) = rkyv::check_archived_root::<ipc_shm::IdeState>(&LATEST_BYTES) {
+            return state.total_additions as u32;
+        }
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn minimal_nvim_get_num_files() -> u32 {
+    unsafe {
+        if LATEST_BYTES.is_empty() { return 0; }
+        if let Ok(state) = rkyv::check_archived_root::<ipc_shm::IdeState>(&LATEST_BYTES) {
+            return state.changed_files.len() as u32;
+        }
         0
     }
 }
