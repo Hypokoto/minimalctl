@@ -8,6 +8,25 @@ use bytecheck::CheckBytes;
 
 #[derive(Archive, Deserialize, Serialize, Debug, PartialEq)]
 #[archive(check_bytes)]
+pub struct ZeroCopyDiffLine {
+    pub tag: String, // "+", "-", " "
+    pub content: String,
+    pub old_lineno: Option<usize>,
+    pub new_lineno: Option<usize>,
+}
+
+#[derive(Archive, Deserialize, Serialize, Debug, PartialEq)]
+#[archive(check_bytes)]
+pub struct ZeroCopyDiffHunk {
+    pub old_start: usize,
+    pub old_lines: usize,
+    pub new_start: usize,
+    pub new_lines: usize,
+    pub lines: Vec<ZeroCopyDiffLine>,
+}
+
+#[derive(Archive, Deserialize, Serialize, Debug, PartialEq)]
+#[archive(check_bytes)]
 pub struct DiffFileState {
     pub path: String,
     pub status: String,
@@ -15,6 +34,7 @@ pub struct DiffFileState {
     pub current_hash: u64,
     pub additions: usize,
     pub deletions: usize,
+    pub hunks: Vec<ZeroCopyDiffHunk>,
 }
 
 #[derive(Archive, Deserialize, Serialize, Debug, PartialEq)]

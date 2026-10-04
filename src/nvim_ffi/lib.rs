@@ -139,3 +139,82 @@ pub extern "C" fn minimal_nvim_get_num_files() -> u32 {
         0
     }
 }
+
+#[no_mangle]
+pub extern "C" fn minimal_nvim_get_file_path(file_idx: u32, len_out: *mut usize) -> *const u8 {
+    unsafe {
+        if LATEST_BYTES.is_empty() { return std::ptr::null(); }
+        if let Ok(state) = rkyv::check_archived_root::<ipc_shm::IdeState>(&LATEST_BYTES) {
+            if (file_idx as usize) < state.changed_files.len() {
+                let s = &state.changed_files[file_idx as usize].path;
+                if !len_out.is_null() {
+                    *len_out = s.len();
+                }
+                return s.as_ptr();
+            }
+        }
+        std::ptr::null()
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn minimal_nvim_get_num_hunks(file_idx: u32) -> u32 {
+    unsafe {
+        if LATEST_BYTES.is_empty() { return 0; }
+        if let Ok(state) = rkyv::check_archived_root::<ipc_shm::IdeState>(&LATEST_BYTES) {
+            if (file_idx as usize) < state.changed_files.len() {
+                return state.changed_files[file_idx as usize].hunks.len() as u32;
+            }
+        }
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn minimal_nvim_get_hunk_new_start(file_idx: u32, hunk_idx: u32) -> u32 {
+    unsafe {
+        if LATEST_BYTES.is_empty() { return 0; }
+        if let Ok(state) = rkyv::check_archived_root::<ipc_shm::IdeState>(&LATEST_BYTES) {
+            if let Some(file) = state.changed_files.get(file_idx as usize) {
+                if let Some(hunk) = file.hunks.get(hunk_idx as usize) {
+                    return hunk.new_start as u32;
+                }
+            }
+        }
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn minimal_nvim_get_num_lines(file_idx: u32, hunk_idx: u32) -> u32 {
+    unsafe {
+        if LATEST_BYTES.is_empty() { return 0; }
+        if let Ok(state) = rkyv::check_archived_root::<ipc_shm::IdeState>(&LATEST_BYTES) {
+            if let Some(file) = state.changed_files.get(file_idx as usize) {
+                if let Some(hunk) = file.hunks.get(hunk_idx as usize) {
+                    return hunk.lines.len() as u32;
+                }
+            }
+        }
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn minimal_nvim_get_line_tag(file_idx: u32, hunk_idx: u32, line_idx: u32) -> u8 {
+    unsafe {
+        if LATEST_BYTES.is_empty() { return b' '; }
+        if let Ok(state) = rkyv::check_archived_root::<ipc_shm::IdeState>(&LATEST_BYTES) {
+            if let Some(file) = state.changed_files.get(file_idx as usize) {
+                if let Some(hunk) = file.hunks.get(hunk_idx as usize) {
+                    if let Some(line) = hunk.lines.get(line_idx as usize) {
+                        if !line.tag.is_empty() {
+                            return line.tag.as_bytes()[0];
+                        }
+                    }
+                }
+            }
+        }
+        b' '
+    }
+}
