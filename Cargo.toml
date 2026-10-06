@@ -11,8 +11,6 @@ clap = { version = "4.4", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "0.8"
-notify = "6.1"
-similar = "2.4"
 rkyv = { version = "0.7", features = ["validation", "strict"] }
 memmap2 = "0.9"
 bytecheck = "0.6"
@@ -21,15 +19,6 @@ termimad = "0.35.5"
 [[bin]]
 name = "minimalctl"
 path = "src/main.rs"
-
-[lib]
-name = "minimal_nvim"
-path = "src/nvim_ffi/lib.rs"
-crate-type = ["cdylib"]
-
-[[bin]]
-name = "minimal-ide"
-path = "src/ide/main.rs"
 
 [build-dependencies]
 cc = "1.0"

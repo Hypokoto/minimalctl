@@ -1,12 +1,10 @@
 mod audit;
 mod doctor;
-mod ide;
 mod status;
 
 use audit::AuditReport;
 use clap::{Parser, Subcommand};
 use doctor::DoctorReport;
-use ide::{IdeConfig, IdeServer, FilesystemWatcher};
 use status::SystemStatus;
 use std::fs;
 use std::path::PathBuf;
@@ -83,18 +81,6 @@ enum Commands {
         /// Markdown string or '-' to read from stdin
         content: String,
     },
-    /// Launch the Neovim IDE server (JSON-RPC over stdio or Unix socket)
-    Ide {
-        /// Workspace root (defaults to repo root discovery)
-        #[arg(long)]
-        root: Option<PathBuf>,
-        /// Run in stdio JSON-RPC mode (used by the Neovim plugin)
-        #[arg(long)]
-        stdio: bool,
-        /// Unix socket path (alternative to --stdio)
-        #[arg(long)]
-        socket: Option<PathBuf>,
-    },
 }
 
 fn main() {
@@ -116,32 +102,6 @@ fn main() {
             let report = AuditReport::run(&root);
             if report.fail_count > 0 {
                 std::process::exit(1);
-            }
-        }
-        Commands::Ide { root: ide_root, stdio, socket } => {
-            let workspace = ide_root.unwrap_or(root);
-            let config = IdeConfig::default();
-            let mut server = IdeServer::new(workspace.clone(), config);
-
-            // Spawn filesystem watcher and feed events into server
-            let (watcher_tx, watcher_rx) = std::sync::mpsc::channel();
-            let mut watcher = FilesystemWatcher::new(workspace, watcher_tx);
-            if let Err(e) = watcher.start() {
-                eprintln!("[minimal-ide] watcher start failed: {e}");
-            }
-
-            if stdio || socket.is_none() {
-                if let Err(e) = server.run_stdio(watcher_rx) {
-                    eprintln!("[minimal-ide] stdio error: {e}");
-                    std::process::exit(1);
-                }
-            } else if let Some(sock_path) = socket {
-                // Socket transport does not consume watcher events yet (see docs/roadmap.md).
-                let _watcher_thread = std::thread::spawn(move || for _event in watcher_rx {});
-                if let Err(e) = server.run_socket(&sock_path) {
-                    eprintln!("[minimal-ide] socket error: {e}");
-                    std::process::exit(1);
-                }
             }
         }
         Commands::Tmux => {
