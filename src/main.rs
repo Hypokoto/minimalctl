@@ -71,6 +71,18 @@ enum Commands {
     Audit,
     /// Print authoritative desktop status and socket inventory
     Status,
+    /// Launch the background Tmux Control Mode parser daemon
+    Tmux,
+    /// Audit a command string against malicious signatures
+    AuditCmd {
+        /// The raw command string to audit
+        cmd: String,
+    },
+    /// Render markdown beautifully in the terminal
+    Render {
+        /// Markdown string or '-' to read from stdin
+        content: String,
+    },
     /// Launch the Neovim IDE server (JSON-RPC over stdio or Unix socket)
     Ide {
         /// Workspace root (defaults to repo root discovery)
@@ -132,6 +144,33 @@ fn main() {
                 }
             }
         }
+        Commands::Tmux => {
+            if let Err(e) = tmux::daemon::run_daemon() {
+                eprintln!("[minimalctl] tmux daemon error: {}", e);
+                std::process::exit(1);
+            }
+        }
+        Commands::AuditCmd { cmd } => {
+            if let Err(msg) = audit_cmd::audit_command(&cmd) {
+                eprintln!("{}", msg);
+                std::process::exit(1);
+            }
+        }
+        Commands::Render { content } => {
+            let markdown = if content == "-" {
+                let mut buf = String::new();
+                std::io::Read::read_to_string(&mut std::io::stdin(), &mut buf).unwrap();
+                buf
+            } else {
+                content
+            };
+            if let Err(e) = render::render_markdown(&markdown) {
+                eprintln!("Render error: {}", e);
+                std::process::exit(1);
+            }
+        }
     }
 }
 pub mod tmux;
+pub mod audit_cmd;
+pub mod render;

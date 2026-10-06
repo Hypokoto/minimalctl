@@ -16,6 +16,7 @@ similar = "2.4"
 rkyv = { version = "0.7", features = ["validation", "strict"] }
 memmap2 = "0.9"
 bytecheck = "0.6"
+termimad = "0.35.5"
 
 [[bin]]
 name = "minimalctl"
