@@ -4,15 +4,16 @@ use rkyv::{
     check_archived_root,
     ser::{serializers::AllocSerializer, Serializer},
 };
-use std::fs::{File, OpenOptions};
-use std::path::{Path, PathBuf};
-use std::os::unix::fs::OpenOptionsExt;
+use std::fs::{File, OpenOptions, DirBuilder};
+use std::path::PathBuf;
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 
 fn get_shm_dir() -> PathBuf {
     if let Some(xdg_runtime) = std::env::var_os("XDG_RUNTIME_DIR") {
         PathBuf::from(xdg_runtime).join("minimal_tmux")
     } else {
-        PathBuf::from("/tmp/minimal_tmux")
+        let uid = unsafe { libc::getuid() };
+        PathBuf::from(format!("/tmp/minimal_tmux_{}", uid))
     }
 }
 
@@ -24,15 +25,22 @@ pub fn write_layout(layout: &SpatialNode) -> std::io::Result<()> {
     let bytes = serializer.into_serializer().into_inner();
 
     let dir = get_shm_dir();
-    std::fs::create_dir_all(&dir)?;
+
+    if !dir.exists() {
+        DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(&dir)?;
+    }
 
     let tmp_path = dir.join("layout.tmp");
     let bin_path = dir.join("layout.bin");
 
+    let _ = std::fs::remove_file(&tmp_path);
+
     let mut tmp_file = OpenOptions::new()
         .write(true)
-        .create(true)
-        .truncate(true)
+        .create_new(true)
         .mode(0o600)
         .open(&tmp_path)?;
 
