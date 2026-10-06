@@ -6,7 +6,7 @@ LIBSYSTEMD ?= $(shell pkg-config --cflags --libs libsystemd 2>/dev/null || echo 
 WAYLAND_FLAGS ?= $(shell pkg-config --cflags --libs wayland-client 2>/dev/null || echo "-lwayland-client")
 PIXMAN_FLAGS ?= $(shell pkg-config --cflags --libs pixman-1 2>/dev/null || echo "-lpixman-1")
 
-DAEMONS := target/minbat target/minosd target/minclip target/mincore
+DAEMONS := target/mincore
 PALETTE_H := src/minosd/palette.h
 
 .PHONY: all build clean test audit doctor deploy help palette $(DAEMONS)
@@ -22,18 +22,6 @@ help:
 	@echo "  make doctor  - Run operational diagnostics suite"
 	@echo "  make deploy  - Deploy configuration symlinks via deploy.sh"
 	@echo "  make clean   - Clean build targets"
-
-target/minbat: src/minbat/main.c
-	@mkdir -p target
-	$(CC) $(CFLAGS) $< $(LIBSYSTEMD) -o $@
-
-target/minosd: src/minosd/main.c $(PALETTE_H) src/minosd/wlr-layer-shell-unstable-v1-protocol.c src/minosd/xdg-shell-protocol.c
-	@mkdir -p target
-	$(CC) $(CFLAGS) -Isrc/minosd $< src/minosd/wlr-layer-shell-unstable-v1-protocol.c src/minosd/xdg-shell-protocol.c $(WAYLAND_FLAGS) $(PIXMAN_FLAGS) -lm -o $@
-
-target/minclip: src/minclip/main.c
-	@mkdir -p target
-	$(CC) $(CFLAGS) $< $(WAYLAND_FLAGS) -o $@
 
 target/mincore: src/mincore/main.c src/minbat/main.c src/minosd/main.c $(PALETTE_H) src/minosd/wlr-layer-shell-unstable-v1-protocol.c src/minosd/xdg-shell-protocol.c src/minclip/main.c
 	@mkdir -p target
