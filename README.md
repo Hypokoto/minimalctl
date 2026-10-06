@@ -1,74 +1,51 @@
-# Minimal Dotfiles & Terminal-Native Neovim IDE
+# Minimal Labwc Dotfiles
 
-Minimal is an Arch Linux dotfiles repository for a Hyprland-based desktop, featuring a native C/Rust control plane and a tightly integrated **Terminal-Native Neovim IDE**.
+Minimal is an Arch Linux dotfiles repository for a **Labwc-based Wayland desktop**, engineered for extreme speed (native C/Rust control plane) and zero configuration drift.
 
-## Terminal-Native Neovim IDE
+## Setup & Installation
 
-The **Terminal-Native Neovim IDE** provides the modern, agentic development workflow of VS Code and Google Antigravity while retaining **Neovim** as the high-speed, keyboard-driven text editor.
+This repository is designed to be deployed cleanly onto an Arch Linux system.
 
-### Architecture
-
-Unlike plugins that attempt to run an AI agent inside Neovim or bind to specific vendor APIs, this system adheres to a **strict decoupling principle**:
-- **External CLI Agents** (Codex, Claude Code, Gemini CLI, Aider, custom scripts) run as independent processes in standard PTY terminals.
-- **The Workspace Filesystem & Git Repository** serve as the common ground of truth.
-- **The Rust IDE Core Sidecar (`minimal-ide`)** runs asynchronously alongside Neovim, observing filesystem changes, maintaining snapshot baselines, calculating structured diffs, and attributing modifications between user and agent.
-- **The Neovim Plugin (`ide.nvim`)** acts as the presentation layer, rendering animated diff transitions, floating change reviews, and atomic accept/reject operations directly within the editor.
-
-### Installation
-
-The system is deployed via the standard Minimal installer:
-
+### 1. First-time system setup (Packages + Deploy):
 ```bash
-# Redeploy symlinks and install IDE binaries
+# This installs all necessary Arch packages via pacman and yay,
+# builds the native C/Rust daemons, and deploys the symlinks.
+./install.sh
+```
+
+### 2. Redeploying configs (After editing):
+```bash
+# This safely re-links all dotfiles into ~/.config/ without reinstalling packages.
+# It is completely idempotent and safe to run multiple times.
 ./deploy.sh
 ```
 
-This installs `minimal-ide` to `~/.local/bin/minimal-ide` and injects the Neovim plugin into `~/.config/nvim`.
+*(Note: Both scripts log output to `~/.local/state/minimal-deploy.log` and `~/.local/state/minimal-install.log`)*
 
-### Configuration
+## Architecture
 
-Configuration is managed via TOML. Example configuration elements include:
+See [docs/CODEMAPS/INDEX.md](docs/CODEMAPS/INDEX.md) for detailed architecture maps.
 
-```toml
-[diff]
-animation = true
-animation_duration_ms = 180
-```
+### Core Components
+- **Labwc**: The core Wayland compositor (replacing Hyprland/Sway).
+- **Foot**: The native, lightweight Wayland terminal emulator.
+- **Native C Daemons (`src/`)**:
+  - `minbat` (Battery ACPI monitor)
+  - `minclip` (Wayland clipboard ring)
+  - `minosd` (Wayland layer-shell OSD overlay)
+- **Rust Control Plane (`minimalctl`)**: Orchestration CLI for diagnostics, security audits, and themes.
 
-### Supported Agents
+## Features
+- **Zero-Wakeup Daemons**: Uses `PF_NETLINK` and direct `wayland-client` protocols instead of shell loops.
+- **Strict Theming**: A single source of truth for colors via `themes/*.toml`.
+- **Command Firewall**: Real-time auditing of commands to prevent malicious actions (`zsh/sec.zsh`).
+- **AI Sandbox**: A strict Bubblewrap (`bwrap`) container for AI CLIs to prevent unwanted system modifications (`scripts/ai`).
 
-Any CLI agent that modifies the filesystem will work out of the box. Pre-configured presets include:
-- `codex`
-- `claude`
-- `gemini`
-- `aider`
+## Documentation
 
-### Development
+- [User Guide & Shortcuts](docs/user-guide.md)
+- [Architecture Codemaps](docs/CODEMAPS/INDEX.md)
 
-The IDE is built in Rust (the sidecar) and Lua (the Neovim plugin). See the `docs/` directory for detailed architecture, protocol, and configuration specifications.
+## Contributing
 
-### Limitations & Roadmap
-- Currently supports atomic file modifications and diff visualization.
-- Future roadmap includes parallel sessions, advanced conflict handling, and persistent workspace state.
-- See `docs/roadmap.md` for details.
-
----
-
-## ⚡ Native C System Daemons (`src/`)
-
-Minimal replaces high-overhead shell daemon loops and external CLI wrappers with hyper-optimized, standalone native C daemons built with strict zero-subshell and zero-fork constraints:
-
-### 1. Zero-Wakeup Battery Daemon (`src/minbat/`)
-- Listens on `PF_NETLINK` for true zero-CPU idle operation.
-
-### 2. Wayland Layer-Shell OSD Overlay (`src/minosd/`)
-- Renders progress bars on a Wayland layer surface via `pixman` with 12px rounding.
-
-### 3. In-Memory Wayland Clipboard Ring (`src/minclip/`)
-- Implements Wayland `wl_data_device_manager` directly with zero disk I/O.
-
-## 📁 Repository Structure
-- `docs/` - IDE architecture and design documentation
-- `src/ide/` - Rust source for `minimal-ide` sidecar
-- `nvim/lua/ide/` - Neovim Lua plugin
-- `hypr/` - Hyprland window manager configurations
+Make sure to run `./deploy.sh` after editing any configuration files to apply them to your system.
