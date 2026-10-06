@@ -4,9 +4,9 @@ use rkyv::{
     check_archived_root,
     ser::{serializers::AllocSerializer, Serializer},
 };
-use std::fs::{File, OpenOptions, DirBuilder};
-use std::path::PathBuf;
+use std::fs::{DirBuilder, File, OpenOptions};
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+use std::path::PathBuf;
 
 fn get_shm_dir() -> PathBuf {
     if let Some(xdg_runtime) = std::env::var_os("XDG_RUNTIME_DIR") {
@@ -19,18 +19,15 @@ fn get_shm_dir() -> PathBuf {
 
 pub fn write_layout(layout: &SpatialNode) -> std::io::Result<()> {
     let mut serializer = AllocSerializer::<4096>::default();
-    serializer.serialize_value(layout).map_err(|e| {
-        std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-    })?;
+    serializer
+        .serialize_value(layout)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
     let bytes = serializer.into_serializer().into_inner();
 
     let dir = get_shm_dir();
 
     if !dir.exists() {
-        DirBuilder::new()
-            .recursive(true)
-            .mode(0o700)
-            .create(&dir)?;
+        DirBuilder::new().recursive(true).mode(0o700).create(&dir)?;
     }
 
     let tmp_path = dir.join("layout.tmp");

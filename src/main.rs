@@ -131,6 +131,6 @@ fn main() {
         }
     }
 }
-pub mod tmux;
 pub mod audit_cmd;
 pub mod render;
+pub mod tmux;

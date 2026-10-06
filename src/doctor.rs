@@ -140,7 +140,10 @@ impl DoctorReport {
             });
 
             if !available {
-                println!("[WARN] Wayland component binary not found in PATH: {}", binary);
+                println!(
+                    "[WARN] Wayland component binary not found in PATH: {}",
+                    binary
+                );
                 wayland_ok = false;
             }
         }

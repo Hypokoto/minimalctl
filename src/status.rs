@@ -93,7 +93,11 @@ impl SystemStatus {
             println!(
                 "  {:<20} {}",
                 label,
-                if running { "● Running" } else { "○ Stopped" }
+                if running {
+                    "● Running"
+                } else {
+                    "○ Stopped"
+                }
             );
         }
         println!();

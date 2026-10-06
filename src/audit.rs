@@ -35,7 +35,10 @@ impl AuditReport {
             if let Ok(entries) = fs::read_dir(&p) {
                 for entry in entries.flatten() {
                     let path = entry.path();
-                    if path.extension().is_some_and(|ext| ext == "sh" || ext == "zsh") {
+                    if path
+                        .extension()
+                        .is_some_and(|ext| ext == "sh" || ext == "zsh")
+                    {
                         script_paths.push(path);
                     }
                 }
@@ -56,13 +59,8 @@ impl AuditReport {
                         println!("[FAIL] Unsafe eval in {}:{}", path.display(), i + 1);
                         script_violation = true;
                     }
-                    if (line.contains("curl") || line.contains("wget")) && line.contains("| bash")
-                    {
-                        println!(
-                            "[FAIL] Remote exec pattern in {}:{}",
-                            path.display(),
-                            i + 1
-                        );
+                    if (line.contains("curl") || line.contains("wget")) && line.contains("| bash") {
+                        println!("[FAIL] Remote exec pattern in {}:{}", path.display(), i + 1);
                         script_violation = true;
                     }
                     if line.contains("/tmp/") && line.contains("$$") {
@@ -110,7 +108,9 @@ impl AuditReport {
                 }
             }
         } else {
-            println!("[WARN] Gitleaks binary not found in PATH — skipping automated secret detection");
+            println!(
+                "[WARN] Gitleaks binary not found in PATH — skipping automated secret detection"
+            );
             warn += 1;
         }
 
@@ -157,7 +157,10 @@ impl AuditReport {
                 println!("[PASS] Terminal configuration valid (foot -C syntax verification)");
                 pass += 1;
             } else {
-                println!("[FAIL] Terminal configuration error in {}", foot_cfg.display());
+                println!(
+                    "[FAIL] Terminal configuration error in {}",
+                    foot_cfg.display()
+                );
                 fail += 1;
             }
         } else {

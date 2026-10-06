@@ -11,19 +11,13 @@ pub fn parse_layout(input: &str) -> Option<SpatialNode> {
 }
 
 fn parse_node(input: &str) -> Option<(SpatialNode, &str)> {
-    let mut parts = input.splitn(2, 'x');
-    let width_str = parts.next()?;
-    let rest = parts.next()?;
+    let (width_str, rest) = input.split_once('x')?;
     let width: u16 = width_str.parse().ok()?;
 
-    let mut parts = rest.splitn(2, ',');
-    let height_str = parts.next()?;
-    let rest = parts.next()?;
+    let (height_str, rest) = rest.split_once(',')?;
     let height: u16 = height_str.parse().ok()?;
 
-    let mut parts = rest.splitn(2, ',');
-    let x_str = parts.next()?;
-    let rest = parts.next()?;
+    let (x_str, rest) = rest.split_once(',')?;
     let x: u16 = x_str.parse().ok()?;
 
     let mut delim_idx = None;
@@ -39,8 +33,7 @@ fn parse_node(input: &str) -> Option<(SpatialNode, &str)> {
     let y: u16 = y_str.parse().ok()?;
     let rest = &rest[i..];
 
-    if rest.starts_with(',') {
-        let rest_id = &rest[1..];
+    if let Some(rest_id) = rest.strip_prefix(',') {
         let mut id_end = rest_id.len();
         for (idx, c) in rest_id.char_indices() {
             if !c.is_ascii_digit() {
