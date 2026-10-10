@@ -81,6 +81,18 @@ enum Commands {
         /// Markdown string or '-' to read from stdin
         content: String,
     },
+    /// Trigger system event hooks (e.g., from Kanshi or Udev)
+    Hook {
+        /// The type of hook (e.g. 'display')
+        hook_type: String,
+        /// The payload or profile name
+        payload: String,
+    },
+    /// Manage the Secure AI Sandbox and plugins
+    Ai {
+        #[command(subcommand)]
+        action: ai::AiCommands,
+    },
 }
 
 fn main() {
@@ -129,8 +141,16 @@ fn main() {
                 std::process::exit(1);
             }
         }
+        Commands::Hook { hook_type, payload } => {
+            hook::handle_hook(&hook_type, &payload);
+        }
+        Commands::Ai { action } => {
+            ai::handle_ai(&action);
+        }
     }
 }
 pub mod audit_cmd;
 pub mod render;
 pub mod tmux;
+pub mod hook;
+pub mod ai;

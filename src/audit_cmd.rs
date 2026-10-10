@@ -5,7 +5,7 @@ pub fn audit_command(cmd: &str) -> Result<(), &'static str> {
         "rm -rf /*",
         "curl | bash",
         "curl | sh",
-        "wget -qO-",
+        "wget -qo-",
         "mkfs",
         "dd if=/dev/zero",
         "> /dev/sda",
