@@ -14,3 +14,11 @@ if command -v cargo >/dev/null 2>&1; then
 		fi
 	done
 fi
+
+if command -v nasm >/dev/null 2>&1; then
+	echo "Building pure Assembly minbat..."
+	nasm -f elf64 "$DOTFILES_DIR/src/minbat/minbat.asm" -o "$DOTFILES_DIR/src/minbat/minbat.o"
+	ld "$DOTFILES_DIR/src/minbat/minbat.o" -o "$DOTFILES_DIR/src/minbat/minbat"
+	install -m 755 "$DOTFILES_DIR/src/minbat/minbat" "$HOME/.local/bin/minbat"
+	echo "Installed minbat to ~/.local/bin/minbat"
+fi

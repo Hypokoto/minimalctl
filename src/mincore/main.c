@@ -9,22 +9,19 @@
 #include <sys/prctl.h>
 #include <signal.h>
 
-int minbat_main(int argc, char *argv[]);
 int minosd_main(int argc, char *argv[]);
 int minclip_main(int argc, char *argv[]);
 
 static void print_help(const char *prog) {
     printf("mincore — Unified Multi-Call Wayland Desktop Daemon & Control Plane\n\n");
     printf("Usage:\n");
-    printf("  %s bat [args...]       Battery netlink epoll daemon (minbat)\n", prog);
     printf("  %s osd [args...]       Layer-shell OSD daemon and IPC client (minosd)\n", prog);
     printf("  %s clip [args...]      In-memory clipboard daemon and client (minclip)\n", prog);
     printf("  %s status              Show running status of desktop daemons\n", prog);
-    printf("  %s --daemon            Launch all 3 daemons (bat, osd, clip) in background\n", prog);
+    printf("  %s --daemon            Launch daemons in background\n", prog);
     printf("  %s --dry-run           Run dry-run verification across all subsystems\n", prog);
     printf("  %s help                Show this help message\n\n", prog);
     printf("Multi-call symlinks supported:\n");
-    printf("  minbat  -> dispatches directly to battery monitor\n");
     printf("  minosd  -> dispatches directly to OSD overlay\n");
     printf("  minclip -> dispatches directly to clipboard manager\n");
 }
@@ -46,28 +43,25 @@ static int run_dry_run(void) {
     printf("=== MINCORE DRY-RUN VERIFICATION ===\n");
     char *dry_argv[] = {"mincore", "--dry-run", NULL};
 
-    printf("\n[1/3] Testing minbat...\n");
-    int rc_bat = minbat_main(2, dry_argv);
-
-    printf("\n[2/3] Testing minosd...\n");
+    printf("\n[1/2] Testing minosd...\n");
     int rc_osd = minosd_main(2, dry_argv);
 
-    printf("\n[3/3] Testing minclip...\n");
+    printf("\n[2/2] Testing minclip...\n");
     int rc_clip = minclip_main(2, dry_argv);
 
-    if (rc_bat != 0 || rc_osd != 0 || rc_clip != 0) {
-        fprintf(stderr, "\n[FAIL] Subsystem verification failed: bat=%d osd=%d clip=%d\n",
-                rc_bat, rc_osd, rc_clip);
+    if (rc_osd != 0 || rc_clip != 0) {
+        fprintf(stderr, "\n[FAIL] Subsystem verification failed: osd=%d clip=%d\n",
+                rc_osd, rc_clip);
         return 1;
     }
 
-    printf("\n[OK] All 3 subsystems passed dry-run verification.\n");
+    printf("\n[OK] All subsystems passed dry-run verification.\n");
     return 0;
 }
 
-static void cleanup_children(pid_t p1, pid_t p2, pid_t p3) {
-    pid_t pids[3] = {p1, p2, p3};
-    for (int i = 0; i < 3; i++) {
+static void cleanup_children(pid_t p1, pid_t p2) {
+    pid_t pids[2] = {p1, p2};
+    for (int i = 0; i < 2; i++) {
         if (pids[i] > 0) {
             kill(pids[i], SIGTERM);
             waitpid(pids[i], NULL, 0);
@@ -76,24 +70,11 @@ static void cleanup_children(pid_t p1, pid_t p2, pid_t p3) {
 }
 
 static int run_daemon_supervisor(void) {
-    printf("mincore: Launching background daemons (bat, osd, clip)...\n");
-
-    pid_t p_bat = fork();
-    if (p_bat < 0) {
-        perror("mincore: fork minbat failed");
-        return 1;
-    }
-    if (p_bat == 0) {
-        prctl(PR_SET_NAME, "minbat", 0, 0, 0);
-        char *b_argv[] = {"minbat", NULL};
-        int rc = minbat_main(1, b_argv);
-        _exit(rc);
-    }
+    printf("mincore: Launching background daemons...\n");
 
     pid_t p_osd = fork();
     if (p_osd < 0) {
         perror("mincore: fork minosd failed");
-        cleanup_children(p_bat, 0, 0);
         return 1;
     }
     if (p_osd == 0) {
@@ -106,7 +87,7 @@ static int run_daemon_supervisor(void) {
     pid_t p_clip = fork();
     if (p_clip < 0) {
         perror("mincore: fork minclip failed");
-        cleanup_children(p_bat, p_osd, 0);
+        cleanup_children(p_osd, 0);
         return 1;
     }
     if (p_clip == 0) {
@@ -121,34 +102,26 @@ static int run_daemon_supervisor(void) {
     int status;
     pid_t w;
 
-    w = waitpid(p_bat, &status, WNOHANG);
-    if (w > 0 && ((WIFEXITED(status) && WEXITSTATUS(status) != 0) || WIFSIGNALED(status))) {
-        fprintf(stderr, "mincore: minbat exited early\n");
-        cleanup_children(0, p_osd, p_clip);
-        return 1;
-    }
-
     w = waitpid(p_osd, &status, WNOHANG);
     if (w > 0 && ((WIFEXITED(status) && WEXITSTATUS(status) != 0) || WIFSIGNALED(status))) {
         fprintf(stderr, "mincore: minosd exited early\n");
-        cleanup_children(p_bat, 0, p_clip);
+        cleanup_children(0, p_clip);
         return 1;
     }
 
     w = waitpid(p_clip, &status, WNOHANG);
     if (w > 0 && ((WIFEXITED(status) && WEXITSTATUS(status) != 0) || WIFSIGNALED(status))) {
         fprintf(stderr, "mincore: minclip exited early\n");
-        cleanup_children(p_bat, p_osd, 0);
+        cleanup_children(p_osd, 0);
         return 1;
     }
 
-    printf("mincore: Daemons spawned (bat: %d, osd: %d, clip: %d)\n", p_bat, p_osd, p_clip);
+    printf("mincore: Daemons spawned (osd: %d, clip: %d)\n", p_osd, p_clip);
     return 0;
 }
 
 int main(int argc, char *argv[]) {
     char *base = basename(argv[0]);
-    if (strstr(base, "minbat") != NULL) return minbat_main(argc, argv);
     if (strstr(base, "minosd") != NULL) return minosd_main(argc, argv);
     if (strstr(base, "minclip") != NULL) return minclip_main(argc, argv);
 
@@ -157,9 +130,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (strcmp(argv[1], "bat") == 0 || strcmp(argv[1], "minbat") == 0) {
-        return minbat_main(argc - 1, argv + 1);
-    }
     if (strcmp(argv[1], "osd") == 0 || strcmp(argv[1], "minosd") == 0) {
         return minosd_main(argc - 1, argv + 1);
     }

@@ -23,9 +23,9 @@ help:
 	@echo "  make deploy  - Deploy configuration symlinks via deploy.sh"
 	@echo "  make clean   - Clean build targets"
 
-target/mincore: src/mincore/main.c src/minbat/main.c src/minosd/main.c $(PALETTE_H) src/minosd/wlr-layer-shell-unstable-v1-protocol.c src/minosd/xdg-shell-protocol.c src/minclip/main.c
+target/mincore: src/mincore/main.c src/minosd/main.c $(PALETTE_H) src/minosd/wlr-layer-shell-unstable-v1-protocol.c src/minosd/xdg-shell-protocol.c src/minclip/main.c
 	@mkdir -p target
-	$(CC) $(CFLAGS) -DMINCORE_UNIFIED -Isrc/minosd src/mincore/main.c src/minbat/main.c src/minosd/main.c src/minosd/wlr-layer-shell-unstable-v1-protocol.c src/minosd/xdg-shell-protocol.c src/minclip/main.c $(LIBSYSTEMD) $(WAYLAND_FLAGS) $(PIXMAN_FLAGS) -lm -o $@
+	$(CC) $(CFLAGS) -DMINCORE_UNIFIED -Isrc/minosd src/mincore/main.c src/minosd/main.c src/minosd/wlr-layer-shell-unstable-v1-protocol.c src/minosd/xdg-shell-protocol.c src/minclip/main.c $(WAYLAND_FLAGS) $(PIXMAN_FLAGS) -lm -o $@
 
 build: $(DAEMONS)
 	@cargo build --release
@@ -33,7 +33,6 @@ build: $(DAEMONS)
 test: $(DAEMONS)
 	@cargo test
 	@bash -n deploy.sh install.sh tty-init.sh scripts/*.sh labwc/scripts/*.sh
-	./target/minbat --dry-run
 	@if [[ -n "$${WAYLAND_DISPLAY:-}" && -n "$${XDG_RUNTIME_DIR:-}" ]]; then \
 		./target/minosd --dry-run && ./target/minclip --dry-run && ./target/mincore --dry-run; \
 	else \

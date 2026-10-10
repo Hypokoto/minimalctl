@@ -12,7 +12,6 @@ fn require_success(status: std::io::Result<std::process::ExitStatus>, label: &st
 }
 
 fn main() {
-    println!("cargo:rerun-if-changed=src/minbat/main.c");
     println!("cargo:rerun-if-changed=src/minosd/main.c");
     println!("cargo:rerun-if-changed=src/minosd/palette.h");
     println!("cargo:rerun-if-changed=src/minclip/main.c");
@@ -26,21 +25,6 @@ fn main() {
     let _ = fs::create_dir_all(&target_dir);
 
     let compiler = cc::Build::new().get_compiler();
-
-    // 1. minbat
-    let minbat_src = Path::new(&manifest_dir).join("src/minbat/main.c");
-    if minbat_src.exists() {
-        let out_bin = target_dir.join("minbat");
-        require_success(
-            Command::new(compiler.path())
-                .args(["-O2", "-Wall", "-Wextra"])
-                .arg(&minbat_src)
-                .args(["-lsystemd", "-o"])
-                .arg(&out_bin)
-                .status(),
-            "minbat compilation",
-        );
-    }
 
     // 2. minosd
     let minosd_src = Path::new(&manifest_dir).join("src/minosd/main.c");
@@ -85,7 +69,7 @@ fn main() {
 
     // 4. mincore (unified multi-call binary)
     let mincore_src = Path::new(&manifest_dir).join("src/mincore/main.c");
-    if mincore_src.exists() && minbat_src.exists() && minosd_src.exists() && minclip_src.exists() {
+    if mincore_src.exists() && minosd_src.exists() && minclip_src.exists() {
         let out_bin = target_dir.join("mincore");
         let minosd_dir = Path::new(&manifest_dir).join("src/minosd");
         let proto_layer = minosd_dir.join("wlr-layer-shell-unstable-v1-protocol.c");
@@ -100,12 +84,11 @@ fn main() {
                 "-I/usr/include/pixman-1",
             ])
             .arg(&mincore_src)
-            .arg(&minbat_src)
             .arg(&minosd_src)
             .arg(&proto_layer)
             .arg(&proto_xdg)
             .arg(&minclip_src)
-            .args(["-lsystemd", "-lwayland-client", "-lpixman-1", "-lm", "-o"])
+            .args(["-lwayland-client", "-lpixman-1", "-lm", "-o"])
             .arg(&out_bin)
             .status();
 
