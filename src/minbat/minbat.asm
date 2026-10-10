@@ -27,6 +27,7 @@ section .bss
     active_bat_cap  resq 1
     active_bat_stat resq 1
     read_buf        resb 16
+    stat_buf        resb 16
     dyn_msg         resb 64
     notified_20     resb 1
     notified_15     resb 1
@@ -125,8 +126,7 @@ main_loop:
     call is_discharging
     test rax, rax
     jz sleep_60
-    mov byte [notified_15], 1
-    mov byte [notified_20], 1
+    mov r12, 15
     jmp do_notify
 
 .check_20:
@@ -135,7 +135,7 @@ main_loop:
     call is_discharging
     test rax, rax
     jz sleep_60
-    mov byte [notified_20], 1
+    mov r12, 20
     jmp do_notify
 
 do_notify:
@@ -174,11 +174,27 @@ do_notify:
 .parent:
     ; SYS_WAIT4
     mov rdi, rax
-    xor rsi, rsi
+    sub rsp, 8
+    mov rsi, rsp
     xor rdx, rdx
     xor r10, r10
     mov rax, 61
     syscall
+    
+    ; Check child exit status
+    mov ebx, dword [rsp]
+    add rsp, 8
+    test ebx, ebx
+    jnz sleep_60
+    
+    ; Success, mark notified
+    cmp r12, 15
+    je .mark_15
+    mov byte [notified_20], 1
+    jmp sleep_60
+.mark_15:
+    mov byte [notified_15], 1
+    mov byte [notified_20], 1
     jmp sleep_60
 
 .child:
@@ -213,7 +229,7 @@ is_discharging:
 
     ; SYS_READ
     mov rdi, rbx
-    mov rsi, read_buf
+    mov rsi, stat_buf
     mov rdx, 15
     mov rax, 0
     syscall
@@ -223,7 +239,7 @@ is_discharging:
     mov rax, 3
     syscall
 
-    mov al, byte [read_buf]
+    mov al, byte [stat_buf]
     cmp al, 'D'
     jne .not_discharging
     mov rax, 1

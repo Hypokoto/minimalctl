@@ -21,4 +21,7 @@ if command -v nasm >/dev/null 2>&1; then
 	ld "$DOTFILES_DIR/src/minbat/minbat.o" -o "$DOTFILES_DIR/src/minbat/minbat"
 	install -m 755 "$DOTFILES_DIR/src/minbat/minbat" "$HOME/.local/bin/minbat"
 	echo "Installed minbat to ~/.local/bin/minbat"
+else
+	echo "ERROR: nasm is required to build minbat. Please install nasm."
+	exit 1
 fi
