@@ -1,20 +1,25 @@
-#define _GNU_SOURCE
+#define _GNU_SOURCE /* must precede every include to take effect */
+#include <ctype.h>
+#include <dirent.h>
+#include <libgen.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <libgen.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <sys/prctl.h>
-#include <signal.h>
+#include <unistd.h>
 
+int minbat_main(int argc, char *argv[]);
 int minosd_main(int argc, char *argv[]);
 int minclip_main(int argc, char *argv[]);
 
 static void print_help(const char *prog) {
     printf("mincore — Unified Multi-Call Wayland Desktop Daemon & Control Plane\n\n");
     printf("Usage:\n");
+    printf("  %s bat [args...]       Event-driven battery monitor (minbat)\n", prog);
     printf("  %s osd [args...]       Layer-shell OSD daemon and IPC client (minosd)\n", prog);
     printf("  %s clip [args...]      In-memory clipboard daemon and client (minclip)\n", prog);
     printf("  %s status              Show running status of desktop daemons\n", prog);
@@ -22,19 +27,55 @@ static void print_help(const char *prog) {
     printf("  %s --dry-run           Run dry-run verification across all subsystems\n", prog);
     printf("  %s help                Show this help message\n\n", prog);
     printf("Multi-call symlinks supported:\n");
+    printf("  minbat  -> dispatches directly to battery monitor\n");
     printf("  minosd  -> dispatches directly to OSD overlay\n");
     printf("  minclip -> dispatches directly to clipboard manager\n");
 }
 
+/*
+ * Is a process named `name` running under our uid?
+ * Scans /proc/<pid>/comm directly: no fork, no exec, no pgrep dependency.
+ * comm is truncated to 15 chars by the kernel, so compare at most that much.
+ */
+static int proc_running(const char *name) {
+    size_t want = strlen(name);
+    if (want > 15) want = 15;
+
+    DIR *d = opendir("/proc");
+    if (!d) return 0;
+
+    uid_t me = getuid();
+    int found = 0;
+    struct dirent *de;
+    while (!found && (de = readdir(d)) != NULL) {
+        if (!isdigit((unsigned char)de->d_name[0])) continue;
+
+        char path[320];
+        struct stat st;
+        snprintf(path, sizeof(path), "/proc/%s", de->d_name);
+        if (stat(path, &st) < 0 || st.st_uid != me) continue;
+
+        snprintf(path, sizeof(path), "/proc/%s/comm", de->d_name);
+        FILE *f = fopen(path, "r");
+        if (!f) continue;
+
+        char comm[64] = {0};
+        if (fgets(comm, sizeof(comm), f)) {
+            comm[strcspn(comm, "\n")] = '\0';
+            if (strlen(comm) == want && strncmp(comm, name, want) == 0) found = 1;
+        }
+        fclose(f);
+    }
+    closedir(d);
+    return found;
+}
+
 static int run_status(void) {
     printf("=== MINIMAL DESKTOP STATUS (NATIVE) ===\n\n");
-    const char *daemons[] = {"minbat", "minosd", "minclip", "labwc", "foot", "mako"};
+    const char *daemons[] = {"minbat", "minosd", "minclip", "labwc", "foot", "mako",
+                             "swayidle", "kanshi", "awww-daemon", "lxqt-policykit-agent"};
     for (size_t i = 0; i < sizeof(daemons) / sizeof(daemons[0]); i++) {
-        char cmd[256];
-        snprintf(cmd, sizeof(cmd), "pgrep -u %d -x %s >/dev/null 2>&1 || pgrep -u %d -f '[m]incore %s' >/dev/null 2>&1",
-                 getuid(), daemons[i], getuid(), daemons[i]);
-        int running = (system(cmd) == 0);
-        printf("  %-18s %s\n", daemons[i], running ? "● Running" : "○ Stopped");
+        printf("  %-22s %s\n", daemons[i], proc_running(daemons[i]) ? "● Running" : "○ Stopped");
     }
     return 0;
 }
@@ -122,6 +163,7 @@ static int run_daemon_supervisor(void) {
 
 int main(int argc, char *argv[]) {
     char *base = basename(argv[0]);
+    if (strstr(base, "minbat") != NULL) return minbat_main(argc, argv);
     if (strstr(base, "minosd") != NULL) return minosd_main(argc, argv);
     if (strstr(base, "minclip") != NULL) return minclip_main(argc, argv);
 
@@ -130,6 +172,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    if (strcmp(argv[1], "bat") == 0 || strcmp(argv[1], "minbat") == 0) {
+        return minbat_main(argc - 1, argv + 1);
+    }
     if (strcmp(argv[1], "osd") == 0 || strcmp(argv[1], "minosd") == 0) {
         return minosd_main(argc - 1, argv + 1);
     }

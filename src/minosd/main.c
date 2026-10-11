@@ -32,6 +32,7 @@
 
 typedef struct {
     struct wl_display *display;
+    struct wl_registry *registry;
     struct wl_compositor *compositor;
     struct wl_shm *shm;
     struct zwlr_layer_shell_v1 *layer_shell;
@@ -133,98 +134,40 @@ static void show_osd(MinOsd *app) {
 
 static void hide_osd(MinOsd *app) {
     if (!app->visible) return;
-    wl_surface_attach(app->surface, NULL, 0, 0);
+    memset(app->pixels, 0, app->shm_size);
+    wl_surface_attach(app->surface, app->buffer, 0, 0);
+    wl_surface_damage_buffer(app->surface, 0, 0, OSD_WIDTH, OSD_HEIGHT);
     wl_surface_commit(app->surface);
     app->visible = false;
 }
 
 static void handle_command(MinOsd *app, const char *cmd) {
-    char t = cmd[0];
-    if (t != 'V' && t != 'B') return;
-    app->type = t;
+    if (!cmd || cmd[0] == '\0') return;
 
-    if (t == 'V') {
-        if (strcmp(cmd, "V+5") == 0) {
-            system("wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 5%+ 2>/dev/null");
-        } else if (strcmp(cmd, "V-5") == 0) {
-            system("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- 2>/dev/null");
-        } else if (strcmp(cmd, "VM") == 0) {
-            system("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle 2>/dev/null");
+    if (cmd[0] == 'V') {
+        app->type = 'V';
+        int pct = 0;
+        int muted = 0;
+        const char *p = cmd + 1;
+        while (*p == ' ' || *p == '\t') p++;
+        if (sscanf(p, "%d %d", &pct, &muted) >= 2) {
+            app->percent = (pct < 0) ? 0 : ((pct > 100) ? 100 : pct);
+            app->muted = (muted != 0);
+        } else if (sscanf(p, "%d", &pct) >= 1) {
+            app->percent = (pct < 0) ? 0 : ((pct > 100) ? 100 : pct);
+            app->muted = (strstr(p, "mute") != NULL);
         }
-        FILE *fp = popen("wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null", "r");
-        if (fp) {
-            char line[64];
-            if (fgets(line, sizeof(line), fp)) {
-                app->muted = (strstr(line, "[MUTED]") != NULL);
-                float v = 0.0f;
-                if (sscanf(line, "Volume: %f", &v) >= 1) {
-                    app->percent = (int)(v * 100.0f + 0.5f);
-                }
-            }
-            pclose(fp);
-        }
-    } else if (t == 'B') {
+    } else if (cmd[0] == 'B') {
+        app->type = 'B';
         app->muted = false;
-        char dev_name[256] = {0};
-        int cur = 0, max = 0;
-        DIR *bl_dir = opendir("/sys/class/backlight");
-        if (bl_dir) {
-            struct dirent *de;
-            while ((de = readdir(bl_dir)) != NULL) {
-                if (de->d_name[0] == '.') continue;
-                char cur_path[512], max_path[512];
-                snprintf(cur_path, sizeof(cur_path), "/sys/class/backlight/%s/brightness", de->d_name);
-                snprintf(max_path, sizeof(max_path), "/sys/class/backlight/%s/max_brightness", de->d_name);
-                FILE *f_cur = fopen(cur_path, "r");
-                FILE *f_max = fopen(max_path, "r");
-                if (f_cur && f_max && fscanf(f_cur, "%d", &cur) == 1 &&
-                    fscanf(f_max, "%d", &max) == 1 && max > 0) {
-                    snprintf(dev_name, sizeof(dev_name), "%s", de->d_name);
-                    fclose(f_cur);
-                    fclose(f_max);
-                    break;
-                }
-                if (f_cur) fclose(f_cur);
-                if (f_max) fclose(f_max);
-                cur = max = 0;
-            }
-            closedir(bl_dir);
+        int pct = 0;
+        const char *p = cmd + 1;
+        while (*p == ' ' || *p == '\t') p++;
+        if (sscanf(p, "%d", &pct) >= 1) {
+            app->percent = (pct < 0) ? 0 : ((pct > 100) ? 100 : pct);
         }
-
-        const char *step = NULL;
-        if (strcmp(cmd, "B+10") == 0) {
-            step = "+10%";
-        } else if (strcmp(cmd, "B+5") == 0) {
-            step = "+5%";
-        } else if (strcmp(cmd, "B-10") == 0) {
-            step = "10%-";
-        } else if (strcmp(cmd, "B-5") == 0) {
-            step = "5%-";
-        } else {
-            return;
-        }
-
-        char b_cmd[256];
-        if (dev_name[0] != '\0') {
-            snprintf(b_cmd, sizeof(b_cmd), "brightnessctl -d %s set %s >/dev/null 2>&1", dev_name, step);
-        } else {
-            snprintf(b_cmd, sizeof(b_cmd), "brightnessctl set %s >/dev/null 2>&1", step);
-        }
-        system(b_cmd);
-
-        if (dev_name[0] != '\0' && max > 0) {
-            char cur_path[512];
-            snprintf(cur_path, sizeof(cur_path), "/sys/class/backlight/%s/brightness", dev_name);
-            FILE *f_cur = fopen(cur_path, "r");
-            if (f_cur && fscanf(f_cur, "%d", &cur) == 1) {
-                app->percent = (cur * 100) / max;
-            } else {
-                app->percent = (cur * 100) / max;
-            }
-            if (f_cur) fclose(f_cur);
-        } else {
-            app->percent = 50;
-        }
+    } else {
+        return;
     }
 
     show_osd(app);
@@ -300,6 +243,11 @@ static int send_client_command(const char *cmd) {
     if (fd < 0) return -1;
 
     ssize_t n = sendto(fd, cmd, strlen(cmd), 0, (struct sockaddr *)&addr, sizeof(addr));
+    if (n <= 0) {
+        snprintf(addr.sun_path, sizeof(addr.sun_path), "%s/minclip.sock.osd",
+                 runtime_dir ? runtime_dir : "/run/user/1000");
+        n = sendto(fd, cmd, strlen(cmd), 0, (struct sockaddr *)&addr, sizeof(addr));
+    }
     close(fd);
     return (n > 0) ? 0 : -1;
 }
@@ -312,13 +260,17 @@ int main(int argc, char *argv[]) {
         if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
             printf("minosd — Wayland Layer-Shell OSD Overlay (Synthwave)\n");
             printf("Usage: minosd [COMMAND | OPTIONS]\n");
-            printf("Commands: V+5, V-5, VM, B+10, B-10\n");
+            printf("Commands: V <0-100> [muted], B <0-100>\n");
             printf("Options: --dry-run, --daemon\n");
             return 0;
         }
         if (strcmp(argv[1], "--dry-run") != 0 && strcmp(argv[1], "--daemon") != 0) {
-            // Client mode: dispatch command to daemon socket and exit
-            return send_client_command(argv[1]);
+            char cmd_buf[64] = {0};
+            for (int i = 1; i < argc; i++) {
+                if (i > 1) strncat(cmd_buf, " ", sizeof(cmd_buf) - strlen(cmd_buf) - 1);
+                strncat(cmd_buf, argv[i], sizeof(cmd_buf) - strlen(cmd_buf) - 1);
+            }
+            return send_client_command(cmd_buf);
         }
     }
 
@@ -335,22 +287,32 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    struct wl_registry *registry = wl_display_get_registry(app.display);
-    wl_registry_add_listener(registry, &registry_listener, &app);
+    app.registry = wl_display_get_registry(app.display);
+    wl_registry_add_listener(app.registry, &registry_listener, &app);
     wl_display_roundtrip(app.display);
 
     if (!app.compositor || !app.shm || !app.layer_shell) {
         fprintf(stderr, "minosd: Missing required Wayland interfaces\n");
+        if (app.registry) wl_registry_destroy(app.registry);
         wl_display_disconnect(app.display);
         return 1;
     }
 
     if (init_shm_buffer(&app) < 0) {
         fprintf(stderr, "minosd: Failed to create shm buffer\n");
+        if (app.compositor) wl_compositor_destroy(app.compositor);
+        if (app.shm) wl_shm_destroy(app.shm);
+        if (app.layer_shell) zwlr_layer_shell_v1_destroy(app.layer_shell);
+        if (app.registry) wl_registry_destroy(app.registry);
+        wl_display_disconnect(app.display);
         return 1;
     }
 
     app.surface = wl_compositor_create_surface(app.compositor);
+    struct wl_region *empty_region = wl_compositor_create_region(app.compositor);
+    wl_surface_set_input_region(app.surface, empty_region);
+    wl_region_destroy(empty_region);
+
     app.layer_surface = zwlr_layer_shell_v1_get_layer_surface(
         app.layer_shell, app.surface, NULL,
         ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY, "minosd"
@@ -375,9 +337,19 @@ int main(int argc, char *argv[]) {
         wl_buffer_destroy(app.buffer);
         munmap(app.pixels, app.shm_size);
         close(app.shm_fd);
+        if (app.compositor) wl_compositor_destroy(app.compositor);
+        if (app.shm) wl_shm_destroy(app.shm);
+        if (app.layer_shell) zwlr_layer_shell_v1_destroy(app.layer_shell);
+        if (app.registry) wl_registry_destroy(app.registry);
         wl_display_disconnect(app.display);
         return 0;
     }
+
+    // Initial surface state: map with transparent buffer
+    memset(app.pixels, 0, app.shm_size);
+    wl_surface_attach(app.surface, app.buffer, 0, 0);
+    wl_surface_damage_buffer(app.surface, 0, 0, OSD_WIDTH, OSD_HEIGHT);
+    wl_surface_commit(app.surface);
 
     // Setup UNIX domain socket for commands
     const char *runtime_dir = getenv("XDG_RUNTIME_DIR");
@@ -390,8 +362,20 @@ int main(int argc, char *argv[]) {
 
     app.sock_fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
     if (app.sock_fd < 0 || bind(app.sock_fd, (struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
-        fprintf(stderr, "minosd: Failed to bind command socket\n");
-        return 1;
+        if (errno == EACCES || errno == EPERM) {
+            if (app.sock_fd >= 0) close(app.sock_fd);
+            snprintf(saddr.sun_path, sizeof(saddr.sun_path), "%s/minclip.sock.osd",
+                     runtime_dir ? runtime_dir : "/run/user/1000");
+            unlink(saddr.sun_path);
+            app.sock_fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+            if (app.sock_fd < 0 || bind(app.sock_fd, (struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
+                fprintf(stderr, "minosd: Failed to bind command socket (%s): %s\n", saddr.sun_path, strerror(errno));
+                return 1;
+            }
+        } else {
+            fprintf(stderr, "minosd: Failed to bind command socket (%s): %s\n", saddr.sun_path, strerror(errno));
+            return 1;
+        }
     }
 
     app.timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
@@ -420,9 +404,19 @@ int main(int argc, char *argv[]) {
     char cmd_buf[32];
 
     while (app.running) {
+        if (wl_display_get_error(app.display)) {
+            app.running = false;
+            break;
+        }
+
         while (wl_display_prepare_read(app.display) != 0) {
+            if (wl_display_get_error(app.display)) {
+                app.running = false;
+                break;
+            }
             wl_display_dispatch_pending(app.display);
         }
+        if (!app.running) break;
         wl_display_flush(app.display);
 
         int n = epoll_wait(app.epoll_fd, events, 8, -1);
@@ -453,7 +447,10 @@ int main(int argc, char *argv[]) {
         }
 
         if (wl_readable) {
-            wl_display_read_events(app.display);
+            if (wl_display_read_events(app.display) < 0) {
+                app.running = false;
+                break;
+            }
             wl_display_dispatch_pending(app.display);
         } else {
             wl_display_cancel_read(app.display);
@@ -470,6 +467,10 @@ int main(int argc, char *argv[]) {
     wl_buffer_destroy(app.buffer);
     munmap(app.pixels, app.shm_size);
     close(app.shm_fd);
+    if (app.compositor) wl_compositor_destroy(app.compositor);
+    if (app.shm) wl_shm_destroy(app.shm);
+    if (app.layer_shell) zwlr_layer_shell_v1_destroy(app.layer_shell);
+    if (app.registry) wl_registry_destroy(app.registry);
     wl_display_disconnect(app.display);
 
     return 0;

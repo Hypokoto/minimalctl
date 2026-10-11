@@ -1,4 +1,4 @@
-use crate::status::SystemStatus;
+use crate::status::{scan_processes, SystemStatus};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -11,7 +11,7 @@ pub struct DoctorReport {
 }
 
 impl DoctorReport {
-    pub fn run<P: AsRef<Path>>(root_dir: P) -> Self {
+    pub fn run<P: AsRef<Path>>(root_dir: P, fix: bool) -> Self {
         let root = root_dir.as_ref();
         println!("MINIMAL DOCTOR — OPERATIONAL DIAGNOSTIC SUITE");
         println!("--------------------------------------------------");
@@ -20,7 +20,22 @@ impl DoctorReport {
         let mut warn = 0;
         let mut fail = 0;
 
-        let status = SystemStatus::collect();
+        let mut status = SystemStatus::collect();
+
+        if fix {
+            if let Ok(units) = &status.failed_user_units {
+                if !units.is_empty() {
+                    println!(
+                        "[FIX] Remediating failed user units: {}",
+                        units.join(", ")
+                    );
+                    let _ = Command::new("systemctl")
+                        .args(["--user", "reset-failed"])
+                        .status();
+                    status = SystemStatus::collect();
+                }
+            }
+        }
 
         // 1. Package Provenance
         if root.join("packages/core.txt").exists() && root.join("packages/cli.txt").exists() {
@@ -43,14 +58,9 @@ impl DoctorReport {
         // 3. Process Budget
         let banned_procs = ["conky", "nm-applet", "nwg-drawer", "hyprlauncher"];
         let mut found_banned = false;
+        let running_procs = scan_processes(None);
         for proc in banned_procs {
-            if Command::new("pgrep")
-                .arg("-x")
-                .arg(proc)
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false)
-            {
+            if running_procs.contains(proc) {
                 println!("[FAIL] Banned process running: {}", proc);
                 found_banned = true;
             }
@@ -63,21 +73,43 @@ impl DoctorReport {
         }
 
         // 4. Failed System Units
-        if status.failed_system_units == 0 {
-            println!("[PASS] Failed system units");
-            pass += 1;
-        } else {
-            println!("[WARN] System units failed: {}", status.failed_system_units);
-            warn += 1;
+        match &status.failed_system_units {
+            Ok(units) if units.is_empty() => {
+                println!("[PASS] Failed system units");
+                pass += 1;
+            }
+            Ok(units) => {
+                println!(
+                    "[WARN] System units failed ({}): {}",
+                    units.len(),
+                    units.join(", ")
+                );
+                warn += 1;
+            }
+            Err(e) => {
+                println!("[WARN] Failed to query system units: {}", e);
+                warn += 1;
+            }
         }
 
         // 5. Failed User Units
-        if status.failed_user_units == 0 {
-            println!("[PASS] Failed user units");
-            pass += 1;
-        } else {
-            println!("[FAIL] User units failed: {}", status.failed_user_units);
-            fail += 1;
+        match &status.failed_user_units {
+            Ok(units) if units.is_empty() => {
+                println!("[PASS] Failed user units");
+                pass += 1;
+            }
+            Ok(units) => {
+                println!(
+                    "[FAIL] User units failed ({}): {}",
+                    units.len(),
+                    units.join(", ")
+                );
+                fail += 1;
+            }
+            Err(e) => {
+                println!("[FAIL] Failed to query user units: {}", e);
+                fail += 1;
+            }
         }
 
         // 6. Theme Source Definition (Standalone)

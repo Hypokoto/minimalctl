@@ -9,9 +9,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/epoll.h>
+#include <sys/mman.h>
 #include <sys/signalfd.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
@@ -35,6 +37,7 @@ typedef struct {
     struct wl_data_device *data_device;
     struct wl_data_offer *current_offer;
     char current_mime[128];
+    bool sensitive;          /* offer carries a password-manager hint: never store */
     uint32_t last_serial;
 
     ClipEntry ring[MAX_ENTRIES];
@@ -47,12 +50,30 @@ typedef struct {
     bool running;
 } MinClip;
 
+static void free_entry(ClipEntry *entry) {
+    if (entry && entry->text) {
+        explicit_bzero(entry->text, entry->len);
+        free(entry->text);
+        entry->text = NULL;
+        entry->len = 0;
+        entry->id = 0;
+    }
+}
+
 static void ring_clear(MinClip *app) {
     for (int i = 0; i < app->count; i++) {
-        free(app->ring[i].text);
-        app->ring[i].text = NULL;
+        free_entry(&app->ring[i]);
     }
     app->count = 0;
+}
+
+/* Privacy wipe: drop history AND release the live selection we may be serving. */
+static void wipe_all(MinClip *app) {
+    ring_clear(app);
+    if (app->data_device) {
+        wl_data_device_set_selection(app->data_device, NULL, app->last_serial);
+        wl_display_flush(app->display);
+    }
 }
 
 static void ring_add(MinClip *app, const char *text, size_t len) {
@@ -67,9 +88,12 @@ static void ring_add(MinClip *app, const char *text, size_t len) {
     if (!copy) return;
     memcpy(copy, text, len);
     copy[len] = '\0';
+#ifdef MADV_DONTDUMP
+    madvise(copy, len + 1, MADV_DONTDUMP);
+#endif
 
     if (app->count == MAX_ENTRIES) {
-        free(app->ring[MAX_ENTRIES - 1].text);
+        free_entry(&app->ring[MAX_ENTRIES - 1]);
         for (int i = MAX_ENTRIES - 1; i > 0; i--) {
             app->ring[i] = app->ring[i - 1];
         }
@@ -89,6 +113,13 @@ static void ring_add(MinClip *app, const char *text, size_t len) {
 static void offer_offer(void *data, struct wl_data_offer *offer, const char *mime) {
     (void)offer;
     MinClip *app = (MinClip *)data;
+    if (strcmp(mime, "x-kde-passwordManagerHint") == 0 ||
+        strcmp(mime, "application/x-keepassxc-selection") == 0 ||
+        strcmp(mime, "text/x-keepassxc-selection") == 0 ||
+        strcmp(mime, "x-password-manager-hint") == 0) {
+        app->sensitive = true;
+        return;
+    }
     if (strcmp(mime, "text/plain;charset=utf-8") == 0 ||
         (strcmp(mime, "text/plain") == 0 && app->current_mime[0] == '\0') ||
         (strcmp(mime, "UTF8_STRING") == 0 && app->current_mime[0] == '\0')) {
@@ -111,13 +142,19 @@ static void device_data_offer(void *data, struct wl_data_device *dev, struct wl_
     MinClip *app = (MinClip *)data;
     app->current_offer = offer;
     app->current_mime[0] = '\0';
+    app->sensitive = false;
     wl_data_offer_add_listener(offer, &offer_listener, app);
 }
 
 static void device_selection(void *data, struct wl_data_device *dev, struct wl_data_offer *offer) {
     (void)dev;
     MinClip *app = (MinClip *)data;
-    if (!offer || app->current_mime[0] == '\0') return;
+    if (!offer) return;
+    if (app->current_mime[0] == '\0' || app->sensitive) {
+        wl_data_offer_destroy(offer);
+        app->current_offer = NULL;
+        return;
+    }
 
     int pfd[2];
     if (pipe2(pfd, O_CLOEXEC) < 0) return;
@@ -131,9 +168,14 @@ static void device_selection(void *data, struct wl_data_device *dev, struct wl_d
         close(pfd[0]);
         return;
     }
+#ifdef MADV_DONTDUMP
+    madvise(buf, MAX_ENTRY_LEN, MADV_DONTDUMP);
+#endif
 
     size_t total = 0;
     while (total < MAX_ENTRY_LEN - 1) {
+        struct pollfd pf = { .fd = pfd[0], .events = POLLIN };
+        if (poll(&pf, 1, 300) <= 0) break; /* stalled source must never hang the daemon */
         ssize_t n = read(pfd[0], buf + total, MAX_ENTRY_LEN - 1 - total);
         if (n <= 0) break;
         total += n;
@@ -144,7 +186,10 @@ static void device_selection(void *data, struct wl_data_device *dev, struct wl_d
     if (total > 0) {
         ring_add(app, buf, total);
     }
+    explicit_bzero(buf, MAX_ENTRY_LEN);
     free(buf);
+    wl_data_offer_destroy(offer); /* was leaked on every selection */
+    app->current_offer = NULL;
 }
 
 static void device_enter(void *d, struct wl_data_device *dev, uint32_t s, struct wl_surface *surf, wl_fixed_t x, wl_fixed_t y, struct wl_data_offer *o) {
@@ -178,7 +223,14 @@ static void source_send(void *data, struct wl_data_source *source, const char *m
     }
     close(fd);
 }
-static void source_cancelled(void *d, struct wl_data_source *s) { (void)d; wl_data_source_destroy(s); }
+static void source_cancelled(void *d, struct wl_data_source *s) {
+    ClipEntry *snap = (ClipEntry *)d;
+    if (snap) {
+        free_entry(snap);
+        free(snap);
+    }
+    wl_data_source_destroy(s);
+}
 static void source_dnd_drop_performed(void *d, struct wl_data_source *s) { (void)d; (void)s; }
 static void source_dnd_finished(void *d, struct wl_data_source *s) { (void)d; (void)s; }
 static void source_action(void *d, struct wl_data_source *s, uint32_t a) { (void)d; (void)s; (void)a; }
@@ -202,8 +254,20 @@ static void copy_entry_to_clipboard(MinClip *app, int id) {
     }
     if (!target) return;
 
+    /* Snapshot: ring slots shift, so a pointer into the ring would dangle. */
+    ClipEntry *snap = calloc(1, sizeof(*snap));
+    if (!snap) return;
+    snap->text = malloc(target->len + 1);
+    if (!snap->text) { free(snap); return; }
+    memcpy(snap->text, target->text, target->len + 1);
+#ifdef MADV_DONTDUMP
+    madvise(snap->text, target->len + 1, MADV_DONTDUMP);
+#endif
+    snap->len = target->len;
+    snap->id = target->id;
+
     struct wl_data_source *source = wl_data_device_manager_create_data_source(app->data_device_mgr);
-    wl_data_source_add_listener(source, &source_listener, target);
+    wl_data_source_add_listener(source, &source_listener, snap);
     wl_data_source_offer(source, "text/plain;charset=utf-8");
     wl_data_source_offer(source, "text/plain");
     wl_data_source_offer(source, "UTF8_STRING");
@@ -227,7 +291,35 @@ static const struct wl_registry_listener registry_listener = {
     .global_remove = registry_global_remove,
 };
 
+static const char *rt_dir(void) {
+    static char fallback[64];
+    const char *env = getenv("XDG_RUNTIME_DIR");
+    if (env && env[0] == '/') return env;
+    snprintf(fallback, sizeof(fallback), "/run/user/%u", (unsigned)getuid());
+    return fallback;
+}
+
+static void write_all(int fd, const char *buf, size_t count) {
+    size_t written = 0;
+    while (written < count) {
+        ssize_t n = write(fd, buf + written, count - written);
+        if (n <= 0) break;
+        written += n;
+    }
+}
+
 static void handle_client_conn(MinClip *app, int cfd) {
+    /* Same-uid only, and never let a silent client stall the event loop. */
+    struct ucred cred;
+    socklen_t clen = sizeof(cred);
+    if (getsockopt(cfd, SOL_SOCKET, SO_PEERCRED, &cred, &clen) < 0 || cred.uid != getuid()) {
+        close(cfd);
+        return;
+    }
+    struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
+    setsockopt(cfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(cfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
     char req[64];
     ssize_t n = read(cfd, req, sizeof(req) - 1);
     if (n <= 0) { close(cfd); return; }
@@ -246,26 +338,37 @@ static void handle_client_conn(MinClip *app, int cfd) {
             }
             preview[p] = '\0';
             int len = snprintf(line, sizeof(line), "%d\t%s\n", app->ring[i].id, preview);
-            write(cfd, line, len);
+            write_all(cfd, line, len);
         }
     } else if (strncmp(req, "COPY ", 5) == 0) {
         int id = atoi(req + 5);
         copy_entry_to_clipboard(app, id);
         write(cfd, "OK\n", 3);
+    } else if (strncmp(req, "DELETE ", 7) == 0) {
+        int id = atoi(req + 7);
+        for (int i = 0; i < app->count; i++) {
+            if (app->ring[i].id == id) {
+                free_entry(&app->ring[i]);
+                for (int j = i; j < app->count - 1; j++) {
+                    app->ring[j] = app->ring[j + 1];
+                }
+                app->count--;
+                break;
+            }
+        }
+        write(cfd, "OK\n", 3);
     } else if (strncmp(req, "CLEAR", 5) == 0) {
-        ring_clear(app);
+        wipe_all(app);
         write(cfd, "OK\n", 3);
     }
     close(cfd);
 }
 
 static int client_ipc_request(const char *cmd) {
-    const char *runtime_dir = getenv("XDG_RUNTIME_DIR");
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    snprintf(addr.sun_path, sizeof(addr.sun_path), "%s/%s",
-             runtime_dir ? runtime_dir : "/run/user/1000", SOCK_NAME);
+    snprintf(addr.sun_path, sizeof(addr.sun_path), "%s/%s", rt_dir(), SOCK_NAME);
 
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) return 1;
@@ -296,6 +399,7 @@ int main(int argc, char *argv[]) {
             printf("  --daemon      Run Wayland clipboard daemon\n");
             printf("  --list, -l    Dump clipboard history to stdout (fuzzel integration)\n");
             printf("  --copy <id>   Copy item <id> back to Wayland clipboard\n");
+            printf("  --delete <id> Delete item <id> from clipboard ring\n");
             printf("  --clear       Clear clipboard ring\n");
             printf("  --dry-run     Validate Wayland data device binding and exit\n");
             return 0;
@@ -306,6 +410,11 @@ int main(int argc, char *argv[]) {
         if (strcmp(argv[1], "--copy") == 0 && argc > 2) {
             char cmd[64];
             snprintf(cmd, sizeof(cmd), "COPY %s\n", argv[2]);
+            return client_ipc_request(cmd);
+        }
+        if (strcmp(argv[1], "--delete") == 0 && argc > 2) {
+            char cmd[64];
+            snprintf(cmd, sizeof(cmd), "DELETE %s\n", argv[2]);
             return client_ipc_request(cmd);
         }
         if (strcmp(argv[1], "--clear") == 0) {
@@ -340,17 +449,19 @@ int main(int argc, char *argv[]) {
     if (dry_run) {
         printf("minclip [dry-run]: Wayland data_device_manager bound successfully\n");
         wl_data_device_destroy(app.data_device);
+        if (app.seat) wl_seat_destroy(app.seat);
+        if (app.data_device_mgr) wl_data_device_manager_destroy(app.data_device_mgr);
+        if (app.registry) wl_registry_destroy(app.registry);
         wl_display_disconnect(app.display);
         return 0;
     }
 
     // UNIX Domain Socket Server
-    const char *runtime_dir = getenv("XDG_RUNTIME_DIR");
     struct sockaddr_un saddr;
     memset(&saddr, 0, sizeof(saddr));
     saddr.sun_family = AF_UNIX;
-    snprintf(saddr.sun_path, sizeof(saddr.sun_path), "%s/%s",
-             runtime_dir ? runtime_dir : "/run/user/1000", SOCK_NAME);
+    snprintf(saddr.sun_path, sizeof(saddr.sun_path), "%s/%s", rt_dir(), SOCK_NAME);
+    umask(077); /* socket is owner-only from creation */
     unlink(saddr.sun_path);
 
     app.sock_fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
@@ -409,7 +520,7 @@ int main(int argc, char *argv[]) {
                 struct signalfd_siginfo fdsi;
                 if (read(app.sig_fd, &fdsi, sizeof(fdsi)) == sizeof(fdsi)) {
                     if (fdsi.ssi_signo == SIGUSR1) {
-                        ring_clear(&app); // Screen locked -> privacy wipe!
+                        wipe_all(&app); // Screen locked -> privacy wipe (history + live selection)
                     } else {
                         app.running = false;
                     }
@@ -431,6 +542,9 @@ int main(int argc, char *argv[]) {
     close(app.sig_fd);
     close(app.epoll_fd);
     wl_data_device_destroy(app.data_device);
+    if (app.seat) wl_seat_destroy(app.seat);
+    if (app.data_device_mgr) wl_data_device_manager_destroy(app.data_device_mgr);
+    if (app.registry) wl_registry_destroy(app.registry);
     wl_display_disconnect(app.display);
 
     return 0;

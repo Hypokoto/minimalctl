@@ -6,13 +6,13 @@ pub fn handle_hook(hook_type: &str, payload: &str) {
 
         // 1. Reload Wallpaper daemon gracefully
         let _ = Command::new("systemctl")
-            .args(&["--user", "restart", "minimal-wallpaper.service"])
+            .args(["--user", "restart", "minimal-wallpaper.service"])
             .status();
 
         // 2. Restart Layer-shell OSD cleanly via systemd
         println!("minctl hook: Restarting OSD overlay");
         let _ = Command::new("systemctl")
-            .args(&["--user", "restart", "minimal-minosd.service"])
+            .args(["--user", "restart", "minimal-minosd.service"])
             .status();
 
     } else {

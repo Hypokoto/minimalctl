@@ -64,7 +64,11 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Run single-pass operational diagnostic suite across desktop invariants
-    Doctor,
+    Doctor {
+        /// Automatically remediate recoverable failures
+        #[arg(long)]
+        fix: bool,
+    },
     /// Run security, syntax, and permission audit suite
     Audit,
     /// Print authoritative desktop status and socket inventory
@@ -104,8 +108,8 @@ fn main() {
             let status = SystemStatus::collect();
             status.print_report();
         }
-        Commands::Doctor => {
-            let report = DoctorReport::run(&root);
+        Commands::Doctor { fix } => {
+            let report = DoctorReport::run(&root, fix);
             if report.fail_count > 0 {
                 std::process::exit(1);
             }

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+use std::os::unix::fs::MetadataExt;
 use std::process::Command;
 
 #[derive(Debug, Clone, Default)]
@@ -8,27 +10,73 @@ pub struct SocketStats {
 }
 
 pub struct SystemStatus {
-    pub failed_user_units: usize,
-    pub failed_system_units: usize,
+    pub failed_user_units: Result<Vec<String>, String>,
+    pub failed_system_units: Result<Vec<String>, String>,
     pub firewall_active: bool,
     pub sockets: SocketStats,
     #[allow(dead_code)]
     pub uncategorized_procs: usize,
 }
 
+pub fn scan_processes(target_uid: Option<u32>) -> HashSet<String> {
+    let mut procs = HashSet::new();
+    if let Ok(entries) = std::fs::read_dir("/proc") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                if file_name.chars().all(|c| c.is_ascii_digit()) {
+                    if let Some(uid) = target_uid {
+                        match entry.metadata() {
+                            Ok(meta) if meta.uid() == uid => {}
+                            _ => continue,
+                        }
+                    }
+                    if let Ok(comm) = std::fs::read_to_string(path.join("comm")) {
+                        procs.insert(comm.trim().to_string());
+                    }
+                }
+            }
+        }
+    }
+    procs
+}
+
+fn query_failed_units(user: bool) -> Result<Vec<String>, String> {
+    let mut cmd = Command::new("systemctl");
+    if user {
+        cmd.arg("--user");
+    }
+    cmd.args(["list-units", "--failed", "--plain", "--no-legend"]);
+    match cmd.output() {
+        Ok(output) if output.status.success() => {
+            let text = String::from_utf8_lossy(&output.stdout);
+            Ok(text.lines()
+                .filter_map(|line| {
+                    let trimmed = line.trim();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        trimmed.split_whitespace().next().map(|s| s.to_string())
+                    }
+                })
+                .collect())
+        }
+        Ok(output) => {
+            let err = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            Err(if err.is_empty() {
+                format!("systemctl exited with status {}", output.status)
+            } else {
+                err
+            })
+        }
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 impl SystemStatus {
     pub fn collect() -> Self {
-        let failed_user_units = Command::new("systemctl")
-            .args(["--user", "--failed", "--no-legend"])
-            .output()
-            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
-            .unwrap_or(0);
-
-        let failed_system_units = Command::new("systemctl")
-            .args(["--failed", "--no-legend"])
-            .output()
-            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
-            .unwrap_or(0);
+        let failed_user_units = query_failed_units(true);
+        let failed_system_units = query_failed_units(false);
 
         let firewall_active = Command::new("systemctl")
             .args(["is-active", "nftables"])
@@ -65,13 +113,8 @@ impl SystemStatus {
         println!("=== MINIMAL DESKTOP STATUS ===");
         println!();
         println!("SESSION STATE");
-        let uid_str = Command::new("id")
-            .arg("-u")
-            .output()
-            .ok()
-            .and_then(|o| String::from_utf8(o.stdout).ok())
-            .unwrap_or_default();
-        let uid = uid_str.trim();
+        let current_uid = unsafe { libc::getuid() };
+        let running_procs = scan_processes(Some(current_uid));
 
         for (label, proc) in [
             ("labwc", "labwc"),
@@ -81,15 +124,7 @@ impl SystemStatus {
             ("minosd", "minosd"),
             ("minbat", "minbat"),
         ] {
-            let mut pgrep_cmd = Command::new("pgrep");
-            if !uid.is_empty() {
-                pgrep_cmd.args(["-u", uid]);
-            }
-            let running = pgrep_cmd
-                .args(["-x", proc])
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false);
+            let running = running_procs.contains(proc);
             println!(
                 "  {:<20} {}",
                 label,
@@ -130,10 +165,10 @@ impl SystemStatus {
         println!("  Unknown Listeners    PASS (Justified)");
         println!(
             "  Failed User Units    {}",
-            if self.failed_user_units == 0 {
-                "PASS (0 failed)".to_string()
-            } else {
-                format!("FAIL ({} failed)", self.failed_user_units)
+            match &self.failed_user_units {
+                Ok(units) if units.is_empty() => "PASS (0 failed)".to_string(),
+                Ok(units) => format!("FAIL ({} failed: {})", units.len(), units.join(", ")),
+                Err(e) => format!("FAIL (query error: {})", e),
             }
         );
         println!("  Process Budget       PASS (Clean)");

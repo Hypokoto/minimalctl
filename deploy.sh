@@ -7,21 +7,17 @@ mkdir -p "$HOME/.local/bin"
 if command -v cargo >/dev/null 2>&1; then
 	echo "Building minimalctl..."
 	(cd "$DOTFILES_DIR" && cargo build --release)
-	for daemon in minimalctl minosd min-auth; do
-		if [[ -f "$DOTFILES_DIR/target/release/$daemon" ]]; then
-			install -m 755 "$DOTFILES_DIR/target/release/$daemon" "$HOME/.local/bin/$daemon"
-			echo "Installed $daemon to ~/.local/bin/$daemon"
-		fi
-	done
+	if [[ -f "$DOTFILES_DIR/target/release/minimalctl" ]]; then
+		install -m 755 "$DOTFILES_DIR/target/release/minimalctl" "$HOME/.local/bin/minimalctl"
+		echo "Installed minimalctl to ~/.local/bin/minimalctl"
+	fi
 fi
 
-if command -v nasm >/dev/null 2>&1; then
-	echo "Building pure Assembly minbat..."
-	nasm -f elf64 "$DOTFILES_DIR/src/minbat/minbat.asm" -o "$DOTFILES_DIR/src/minbat/minbat.o"
-	ld "$DOTFILES_DIR/src/minbat/minbat.o" -o "$DOTFILES_DIR/src/minbat/minbat"
-	install -m 755 "$DOTFILES_DIR/src/minbat/minbat" "$HOME/.local/bin/minbat"
-	echo "Installed minbat to ~/.local/bin/minbat"
-else
-	echo "ERROR: nasm is required to build minbat. Please install nasm."
-	exit 1
+if make -C "$DOTFILES_DIR" "target/mincore" >/dev/null 2>&1; then
+	install -m 755 "$DOTFILES_DIR/target/mincore" "$HOME/.local/bin/mincore"
+	echo "Installed unified multi-call daemon to ~/.local/bin/mincore"
+	for daemon in minbat minosd minclip; do
+		ln -sfn "$HOME/.local/bin/mincore" "$HOME/.local/bin/$daemon"
+		echo "Symlinked $daemon -> mincore"
+	done
 fi
