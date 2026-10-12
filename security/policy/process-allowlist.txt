@@ -1,0 +1,10 @@
+# FORMAT: <process_regex>:<classification>
+# Classifications: persistent, event-driven
+swayidle:persistent
+minosd:persistent
+minclip:persistent
+minbat:persistent
+kanshi:persistent
+foot:persistent
+lxqt-policykit-agent:persistent
+awww-daemon:persistent

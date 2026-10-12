@@ -1,0 +1,45 @@
+abi <abi/3.0>,
+include <tunables/global>
+
+profile mincore @{HOME}/.local/bin/mincore {
+  include <abstractions/base>
+  include <abstractions/wayland>
+  include <abstractions/dbus-session-strict>
+
+  # Allow mapping and execution of itself
+  @{HOME}/.local/bin/mincore mr,
+
+  # minbat: battery monitoring
+  /sys/class/power_supply/ r,
+  /sys/class/power_supply/** r,
+  /sys/devices/**/power_supply/** r,
+
+  # Netlink sockets for udev events
+  network netlink raw,
+
+  # minosd / minclip: IPC and Wayland sockets
+  owner @{run}/user/*/minclip.sock rw,
+  owner @{run}/user/*/minclip.sock.* rw,
+  owner @{run}/user/*/minosd.sock rw,
+  owner @{run}/user/*/minosd.sock.* rw,
+  owner @{run}/user/*/bus rw,
+
+  # DBus notifications (minbat and minosd)
+  dbus send
+       bus=session
+       path=/org/freedesktop/Notifications
+       interface=org.freedesktop.Notifications
+       member=Notify
+       peer=(name=org.freedesktop.Notifications),
+
+  # mincore status: read process names for daemon healthchecks
+  /proc/ r,
+  owner /proc/[0-9]*/ r,
+  owner /proc/[0-9]*/stat r,
+  owner /proc/[0-9]*/comm r,
+
+  # Block all capabilities (root escalation) and arbitrary execution
+  deny capability,
+  deny /bin/** x,
+  deny /usr/bin/** x,
+}
