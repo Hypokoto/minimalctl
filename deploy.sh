@@ -21,3 +21,8 @@ if make -C "$DOTFILES_DIR" "target/mincore" >/dev/null 2>&1; then
 		echo "Symlinked $daemon -> mincore"
 	done
 fi
+
+if [[ -f "$DOTFILES_DIR/scripts/ai" ]]; then
+	install -m 755 "$DOTFILES_DIR/scripts/ai" "$HOME/.local/bin/ai"
+	echo "Installed AI sandbox runner to ~/.local/bin/ai"
+fi

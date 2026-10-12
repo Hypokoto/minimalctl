@@ -1,0 +1,336 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Minimal AI Sandbox (bwrap)
+# Purpose: Wraps AI CLI tools in a strict bubblewrap container.
+# - Mounts the entire host system Read-Only.
+# - Provides an isolated private /tmp and tmpfs-masked $HOME.
+# - Grants Read-Write access ONLY to the project directory ($PWD),
+#   AI state/auth directories, trusted workspaces, and explicit MCP/plugin paths.
+# - Projects settings.json, mcp.json, and plugin.json into the container harness.
+# ==============================================================================
+
+set -Eeuo pipefail
+shopt -s inherit_errexit
+
+# --- Cleanup Trap ---
+TMP_SANDBOX_DIR=""
+cleanup() {
+    if [[ -n "${TMP_SANDBOX_DIR:-}" && -d "$TMP_SANDBOX_DIR" ]]; then
+        rm -rf -- "$TMP_SANDBOX_DIR"
+    fi
+}
+trap cleanup EXIT INT TERM
+
+# --- Dependencies Check ---
+for cmd in bwrap jq; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        echo "Error: Required command '$cmd' is not installed." >&2
+        exit 1
+    fi
+done
+
+# --- Usage ---
+usage() {
+    local exit_code="${1:-0}"
+    cat <<'EOF'
+Usage: ai <harness> [args...]
+
+Arguments:
+  harness       The AI harness to launch (e.g., agy, antigravity-cli, claude)
+  args          Arguments passed directly to the harness
+
+Configurations:
+  Project:      ./.mcp.json, ./.ai/settings.json, ./.ai/plugin.json
+  Global:       ~/.config/ai-sandbox/{mcp,settings,plugin}.json
+EOF
+    exit "$exit_code"
+}
+
+if [[ $# -lt 1 ]]; then
+    usage 1
+fi
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    usage 0
+fi
+
+HARNESS="$1"
+shift
+
+# Canonicalize harness command if found in PATH
+if command -v "$HARNESS" >/dev/null 2>&1; then
+    RESOLVED_HARNESS="$(command -v "$HARNESS")"
+else
+    RESOLVED_HARNESS="$HARNESS"
+fi
+
+# Resolve canonical working directory
+TRUE_PWD="$(pwd -P)"
+
+# --- Safety Check: Critical directory protection ---
+if [[ "$TRUE_PWD" == "$HOME" || "$TRUE_PWD" == "/" || "$TRUE_PWD" == "/etc" || "$TRUE_PWD" == "$HOME"/.* || "$TRUE_PWD" == "$HOME/dev" ]]; then
+    echo "🛑 SECURITY BLOCK: Refusing to launch sandbox in '$TRUE_PWD'." >&2
+    echo "This would expose critical user or system directories with write permissions." >&2
+    echo "Please cd into a dedicated project directory (e.g., ~/minimal)." >&2
+    exit 1
+fi
+
+# Ensure base state & auth directories exist on host so bwrap can bind them
+mkdir -p "$HOME/.gemini/antigravity-cli" \
+         "$HOME/.gemini/config/plugins" \
+         "$HOME/.config/antigravity" \
+         "$HOME/.config/antigravity-proxy" \
+         "$HOME/.local/share/antigravity" \
+         "$HOME/.claude" \
+         "$HOME/.config/claude" \
+         "$HOME/.config/ai-sandbox" \
+         "$HOME/.local/bin" \
+         "$HOME/.cargo/bin" \
+         "$HOME/.rustup" \
+         "$HOME/.local/share/ai-sandbox/mcps" \
+         "$HOME/.local/share/ai-sandbox/plugins"
+
+# --- Config Discovery ---
+MCP_FILE=""
+if [[ -f "$TRUE_PWD/.mcp.json" ]]; then
+    MCP_FILE="$TRUE_PWD/.mcp.json"
+elif [[ -f "$TRUE_PWD/mcp.json" ]]; then
+    MCP_FILE="$TRUE_PWD/mcp.json"
+elif [[ -f "$HOME/.config/ai-sandbox/mcp.json" ]]; then
+    MCP_FILE="$HOME/.config/ai-sandbox/mcp.json"
+fi
+
+SETTINGS_FILE=""
+if [[ -f "$TRUE_PWD/.ai/settings.json" ]]; then
+    SETTINGS_FILE="$TRUE_PWD/.ai/settings.json"
+elif [[ -f "$TRUE_PWD/settings.json" ]]; then
+    SETTINGS_FILE="$TRUE_PWD/settings.json"
+elif [[ -f "$HOME/.config/ai-sandbox/settings.json" ]]; then
+    SETTINGS_FILE="$HOME/.config/ai-sandbox/settings.json"
+fi
+
+PLUGIN_FILE=""
+if [[ -f "$TRUE_PWD/.ai/plugin.json" ]]; then
+    PLUGIN_FILE="$TRUE_PWD/.ai/plugin.json"
+elif [[ -f "$TRUE_PWD/plugin.json" ]]; then
+    PLUGIN_FILE="$TRUE_PWD/plugin.json"
+elif [[ -f "$HOME/.config/ai-sandbox/plugin.json" ]]; then
+    PLUGIN_FILE="$HOME/.config/ai-sandbox/plugin.json"
+fi
+
+ALLOW_NETWORK=true
+BIND_ARGS=()
+
+# --- Parse Settings ---
+if [[ -n "$SETTINGS_FILE" && -f "$SETTINGS_FILE" ]]; then
+    net_opt="$(jq -r 'if has("sandbox") and (.sandbox | has("allowNetwork")) then .sandbox.allowNetwork else true end' "$SETTINGS_FILE" 2>/dev/null || echo "true")"
+    if [[ "$net_opt" == "false" ]]; then
+        ALLOW_NETWORK=false
+    fi
+
+    # Trusted workspaces (bind RW)
+    while IFS= read -r ws; do
+        if [[ -n "$ws" ]]; then
+            abs_ws="$(realpath "$ws" 2>/dev/null || readlink -f "$ws" 2>/dev/null || echo "")"
+            if [[ -n "$abs_ws" && -d "$abs_ws" && "$abs_ws" != "$HOME" && "$abs_ws" != "/" && "$abs_ws" != "$TRUE_PWD" ]]; then
+                BIND_ARGS+=("--bind" "$abs_ws" "$abs_ws")
+            fi
+        fi
+    done < <(jq -r '.trustedWorkspaces[]? // empty' "$SETTINGS_FILE" 2>/dev/null | sort -u)
+
+    # Custom roBinds
+    while IFS= read -r ro_path; do
+        if [[ -n "$ro_path" ]]; then
+            abs_ro="$(realpath "$ro_path" 2>/dev/null || readlink -f "$ro_path" 2>/dev/null || echo "")"
+            if [[ -n "$abs_ro" && -e "$abs_ro" ]]; then
+                BIND_ARGS+=("--ro-bind" "$abs_ro" "$abs_ro")
+            fi
+        fi
+    done < <(jq -r '.sandbox.roBinds[]? // empty' "$SETTINGS_FILE" 2>/dev/null | sort -u)
+
+    # Custom rwBinds
+    while IFS= read -r rw_path; do
+        if [[ -n "$rw_path" ]]; then
+            abs_rw="$(realpath "$rw_path" 2>/dev/null || readlink -f "$rw_path" 2>/dev/null || echo "")"
+            if [[ -n "$abs_rw" && -e "$abs_rw" && "$abs_rw" != "$HOME" && "$abs_rw" != "/" && "$abs_rw" != "$TRUE_PWD" ]]; then
+                BIND_ARGS+=("--bind" "$abs_rw" "$abs_rw")
+            fi
+        fi
+    done < <(jq -r '.sandbox.rwBinds[]? // empty' "$SETTINGS_FILE" 2>/dev/null | sort -u)
+fi
+
+# --- Parse MCP Server Paths from mcp.json ---
+if [[ -n "$MCP_FILE" && -f "$MCP_FILE" ]]; then
+    while IFS= read -r path_candidate; do
+        if [[ -n "$path_candidate" ]]; then
+            abs_cand="$(realpath "$path_candidate" 2>/dev/null || readlink -f "$path_candidate" 2>/dev/null || echo "")"
+            if [[ -n "$abs_cand" ]]; then
+                if [[ -d "$abs_cand" && "$abs_cand" != "$HOME" && "$abs_cand" != "/" && "$abs_cand" != "$TRUE_PWD" ]]; then
+                    BIND_ARGS+=("--bind" "$abs_cand" "$abs_cand")
+                elif [[ -f "$abs_cand" ]]; then
+                    dir_name="$(dirname "$abs_cand")"
+                    if [[ "$dir_name" != "$HOME" && "$dir_name" != "/" && "$dir_name" != "$TRUE_PWD" ]]; then
+                        BIND_ARGS+=("--bind" "$dir_name" "$dir_name")
+                    fi
+                fi
+            fi
+        fi
+    done < <(jq -r '.mcpServers[]? | (.command, (.args[]? // empty)) | select(type=="string" and (startswith("/") or startswith("~") or startswith(".")))' "$MCP_FILE" 2>/dev/null | sed "s|^~|$HOME|" | sort -u)
+fi
+
+# --- Parse Plugins from plugin.json ---
+PLUGIN_PATHS=()
+if [[ -n "$PLUGIN_FILE" && -f "$PLUGIN_FILE" ]]; then
+    while IFS= read -r plugin_item; do
+        if [[ -n "$plugin_item" ]]; then
+            target_plugin_dir=""
+            if [[ -d "$plugin_item" ]]; then
+                target_plugin_dir="$(realpath "$plugin_item" 2>/dev/null || readlink -f "$plugin_item" 2>/dev/null)"
+            elif [[ -d "$HOME/.gemini/config/plugins/$plugin_item" ]]; then
+                target_plugin_dir="$HOME/.gemini/config/plugins/$plugin_item"
+            elif [[ -d "$HOME/.local/share/ai-sandbox/plugins/$plugin_item" ]]; then
+                target_plugin_dir="$HOME/.local/share/ai-sandbox/plugins/$plugin_item"
+            fi
+
+            if [[ -n "$target_plugin_dir" && -d "$target_plugin_dir" ]]; then
+                PLUGIN_PATHS+=("$target_plugin_dir")
+                BIND_ARGS+=("--ro-bind" "$target_plugin_dir" "$target_plugin_dir")
+            fi
+        fi
+    done < <(jq -r '.plugins[]? // empty' "$PLUGIN_FILE" 2>/dev/null | sort -u)
+fi
+
+# --- Hybrid Host Runtime & Cache Mounts (Read-Only) ---
+RO_RUNTIMES=(
+    "$HOME/.local/bin"
+    "$HOME/.cargo"
+    "$HOME/.rustup"
+    "$HOME/.nvm"
+    "$HOME/.npm"
+    "$HOME/.local/share/uv"
+    "$HOME/.cache/uv"
+    "$HOME/.local/share/pnpm"
+    "$HOME/.local/share/virtualenvs"
+    "$HOME/.local/share/ai-sandbox/mcps"
+    "$HOME/.local/share/ai-sandbox/plugins"
+)
+
+for rt in "${RO_RUNTIMES[@]}"; do
+    if [[ -d "$rt" ]]; then
+        BIND_ARGS+=("--ro-bind" "$rt" "$rt")
+    fi
+done
+
+# --- Harness Configuration & Plugin Projection ---
+TMP_SANDBOX_DIR="$(mktemp -d -t ai-sandbox-XXXXXX)"
+chmod 700 "$TMP_SANDBOX_DIR"
+
+IS_AGY=false
+if [[ "$HARNESS" == *"antigravity"* || "$HARNESS" == *"agy"* ]]; then
+    IS_AGY=true
+fi
+
+if [[ "$IS_AGY" == "true" ]]; then
+    # 1. Project Antigravity settings
+    MERGED_SETTINGS="$TMP_SANDBOX_DIR/antigravity_settings.json"
+    BASE_SETTINGS="{}"
+    if [[ -f "$HOME/.gemini/antigravity-cli/settings.json" ]]; then
+        BASE_SETTINGS="$(cat "$HOME/.gemini/antigravity-cli/settings.json")"
+    fi
+
+    if [[ -n "$MCP_FILE" && -f "$MCP_FILE" ]]; then
+        jq -s '.[0] * {mcpServers: (.[0].mcpServers // {}) * (.[1].mcpServers // {})}' \
+           <(echo "$BASE_SETTINGS") "$MCP_FILE" > "$MERGED_SETTINGS"
+    else
+        echo "$BASE_SETTINGS" > "$MERGED_SETTINGS"
+    fi
+
+    BIND_ARGS+=("--bind" "$MERGED_SETTINGS" "$HOME/.gemini/antigravity-cli/settings.json")
+
+    # 2. Project plugins manifest into container ~/.gemini/config/plugins.json
+    MERGED_PLUGINS="$TMP_SANDBOX_DIR/plugins.json"
+    if [[ "${#PLUGIN_PATHS[@]}" -gt 0 ]]; then
+        PLUGIN_JSON_ARRAY="$(printf '%s\n' "${PLUGIN_PATHS[@]}" | jq -R . | jq -s '[.[] | {path: .}]')"
+        echo "{\"entries\": $PLUGIN_JSON_ARRAY}" > "$MERGED_PLUGINS"
+        BIND_ARGS+=("--dir" "$HOME/.gemini/config" "--bind" "$MERGED_PLUGINS" "$HOME/.gemini/config/plugins.json")
+    fi
+
+elif [[ "$HARNESS" == *"claude"* ]]; then
+    if [[ -n "$MCP_FILE" && -f "$MCP_FILE" ]]; then
+        CLAUDE_CONFIG="$TMP_SANDBOX_DIR/claude.json"
+        BASE_CLAUDE="{}"
+        if [[ -f "$HOME/.claude.json" ]]; then
+            BASE_CLAUDE="$(cat "$HOME/.claude.json")"
+        fi
+        jq -s '.[0] * {mcpServers: (.[0].mcpServers // {}) * (.[1].mcpServers // {})}' \
+           <(echo "$BASE_CLAUDE") "$MCP_FILE" > "$CLAUDE_CONFIG"
+        BIND_ARGS+=("--bind" "$CLAUDE_CONFIG" "$HOME/.claude.json")
+    fi
+fi
+
+# Network policy
+NET_ARGS=()
+if [[ "$ALLOW_NETWORK" == "true" ]]; then
+    NET_ARGS+=("--share-net")
+else
+    NET_ARGS+=("--unshare-net")
+fi
+
+echo "🛡️  Launching $HARNESS in strict Bubblewrap Sandbox..."
+echo "📂 Project RW: $TRUE_PWD"
+[[ -n "$MCP_FILE" ]] && echo "🔌 MCP Config: $MCP_FILE"
+[[ -n "$SETTINGS_FILE" ]] && echo "⚙️  Settings:   $SETTINGS_FILE"
+[[ -n "$PLUGIN_FILE" ]] && echo "🧩 Plugins:    $PLUGIN_FILE (${#PLUGIN_PATHS[@]} active)"
+echo "🌐 Network:    $([ "$ALLOW_NETWORK" = true ] && echo "Enabled" || echo "Isolated (Airgapped)")"
+
+USER_ID="$(id -u)"
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$USER_ID}"
+DBUS_SOCK="$RUNTIME_DIR/bus"
+if [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" && "${DBUS_SESSION_BUS_ADDRESS}" == unix:path=* ]]; then
+    C_DBUS="${DBUS_SESSION_BUS_ADDRESS#unix:path=}"
+    C_DBUS="${C_DBUS%%,*}"
+    if [[ -S "$C_DBUS" ]]; then
+        DBUS_SOCK="$C_DBUS"
+    fi
+fi
+
+exec bwrap \
+    --ro-bind / / \
+    --dev /dev \
+    --proc /proc \
+    --tmpfs /tmp \
+    --tmpfs "$HOME" \
+    --tmpfs "$RUNTIME_DIR" \
+    --ro-bind-try "$DBUS_SOCK" "$DBUS_SOCK" \
+    --ro-bind-try "$RUNTIME_DIR/keyring" "$RUNTIME_DIR/keyring" \
+    --ro-bind-try "$RUNTIME_DIR/p11-kit" "$RUNTIME_DIR/p11-kit" \
+    --clearenv \
+    --setenv PATH "$PATH" \
+    --setenv HOME "$HOME" \
+    --setenv USER "$USER" \
+    --setenv TERM "$TERM" \
+    --setenv PWD "$TRUE_PWD" \
+    --setenv XDG_RUNTIME_DIR "$RUNTIME_DIR" \
+    --setenv DBUS_SESSION_BUS_ADDRESS "${DBUS_SESSION_BUS_ADDRESS:-unix:path=$DBUS_SOCK}" \
+    --dir "$TRUE_PWD" \
+    --bind "$TRUE_PWD" "$TRUE_PWD" \
+    --dir "$HOME/.config" \
+    --dir "$HOME/.local/share" \
+    --ro-bind-try "$HOME/.gitconfig" "$HOME/.gitconfig" \
+    --ro-bind-try "$HOME/.config/git" "$HOME/.config/git" \
+    --bind "$HOME/.config/antigravity" "$HOME/.config/antigravity" \
+    --ro-bind-try "$HOME/.config/antigravity-proxy" "$HOME/.config/antigravity-proxy" \
+    --bind "$HOME/.local/share/antigravity" "$HOME/.local/share/antigravity" \
+    --dir "$HOME/.gemini" \
+    --bind "$HOME/.gemini" "$HOME/.gemini" \
+    --ro-bind-try "$HOME/.gemini/jetski-standalone-oauth-token" "$HOME/.gemini/antigravity-cli/antigravity-oauth-token" \
+    --ro-bind-try "$HOME/.gemini/config/plugins" "$HOME/.gemini/config/plugins" \
+    --ro-bind-try "$HOME/.gemini/antigravity-cli/mcp" "$HOME/.gemini/antigravity-cli/mcp" \
+    --ro-bind-try "$HOME/.gemini/antigravity-cli/plugins" "$HOME/.gemini/antigravity-cli/plugins" \
+    --bind "$HOME/.claude" "$HOME/.claude" \
+    --bind "$HOME/.config/claude" "$HOME/.config/claude" \
+    "${BIND_ARGS[@]}" \
+    --unshare-all \
+    "${NET_ARGS[@]}" \
+    --die-with-parent \
+    -- "$RESOLVED_HARNESS" "$@"
