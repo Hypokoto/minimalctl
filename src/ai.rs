@@ -11,12 +11,17 @@ pub enum AiCommands {
         #[command(subcommand)]
         action: McpAction,
     },
-    /// Manage AI Skills and Plugins
+    /// Manage AI Plugins in plugin.json
+    Plugin {
+        #[command(subcommand)]
+        action: PluginAction,
+    },
+    /// Manage AI Skills
     Skill {
         #[command(subcommand)]
         action: EntityAction,
     },
-    /// Initialize AI sandbox configuration (.mcp.json and .ai/settings.json) in current directory
+    /// Initialize AI sandbox configuration (.mcp.json, .ai/settings.json, .ai/plugin.json) in current directory
     Init {
         /// Overwrite existing configuration files
         #[arg(short, long)]
@@ -24,7 +29,7 @@ pub enum AiCommands {
     },
     /// Launch an AI harness in the secure bubblewrap sandbox
     Run {
-        /// The harness executable (e.g. `antigravity-cli`, `claude`)
+        /// The harness executable (e.g. `agy`, `antigravity-cli`, `claude`)
         harness: Option<String>,
         /// Arguments passed to the harness
         args: Vec<String>,
@@ -48,6 +53,22 @@ pub enum McpAction {
     /// Remove an MCP server from mcp.json by name
     Remove {
         /// Name of the MCP server to remove
+        name: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum PluginAction {
+    /// List configured plugins from plugin.json and available installed plugins
+    List,
+    /// Add or enable a plugin in plugin.json
+    Add {
+        /// Name of installed plugin (e.g. science) or path to local plugin directory
+        name_or_path: String,
+    },
+    /// Remove or disable a plugin from plugin.json
+    Remove {
+        /// Name of plugin to remove
         name: String,
     },
 }
@@ -78,6 +99,7 @@ pub fn handle_ai(cmd: &AiCommands) {
 
     match cmd {
         AiCommands::Mcp { action } => handle_mcp(action),
+        AiCommands::Plugin { action } => handle_plugin(action),
         AiCommands::Skill { action } => handle_entity(&sandbox_dir.join("skills"), action, "Skill"),
         AiCommands::Init { force } => handle_init(*force),
         AiCommands::Run { harness, args } => run_harness(harness, args),
@@ -223,18 +245,155 @@ fn handle_mcp(action: &McpAction) {
     }
 }
 
+fn find_plugin_config() -> (PathBuf, bool) {
+    let pwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let global_config = PathBuf::from(&home).join(".config/ai-sandbox/plugin.json");
+
+    let candidates = [
+        pwd.join(".ai/plugin.json"),
+        pwd.join("plugin.json"),
+        global_config,
+    ];
+
+    for path in &candidates {
+        if path.exists() {
+            return (path.clone(), true);
+        }
+    }
+
+    if pwd.join(".ai").exists() {
+        (pwd.join(".ai/plugin.json"), false)
+    } else {
+        (pwd.join("plugin.json"), false)
+    }
+}
+
+fn handle_plugin(action: &PluginAction) {
+    let (config_path, exists) = find_plugin_config();
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let host_plugins_dir = PathBuf::from(&home).join(".gemini/config/plugins");
+
+    match action {
+        PluginAction::List => {
+            println!("Active Plugin Config: {}", if exists { config_path.display().to_string() } else { "None (using global default)".to_string() });
+
+            if exists {
+                if let Ok(content) = fs::read_to_string(&config_path) {
+                    if let Ok(val) = serde_json::from_str::<Value>(&content) {
+                        if let Some(plugins) = val.get("plugins").and_then(|p| p.as_array()) {
+                            if plugins.is_empty() {
+                                println!("  (No plugins active in project config)");
+                            } else {
+                                println!("Active Plugins:");
+                                for p in plugins {
+                                    if let Some(name) = p.as_str() {
+                                        println!("  - [x] {}", name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if host_plugins_dir.exists() {
+                println!("\nInstalled Host Plugins (~/.gemini/config/plugins):");
+                if let Ok(entries) = fs::read_dir(&host_plugins_dir) {
+                    for entry in entries.flatten() {
+                        if entry.path().is_dir() {
+                            println!("  * {}", entry.file_name().to_string_lossy());
+                        }
+                    }
+                }
+            }
+        }
+        PluginAction::Add { name_or_path } => {
+            let mut val: Value = if exists {
+                fs::read_to_string(&config_path)
+                    .ok()
+                    .and_then(|c| serde_json::from_str(&c).ok())
+                    .unwrap_or_else(|| json!({ "plugins": [] }))
+            } else {
+                json!({ "plugins": [] })
+            };
+
+            if let Some(obj) = val.as_object_mut() {
+                let plugins = obj.entry("plugins").or_insert_with(|| json!([]));
+                if let Some(arr) = plugins.as_array_mut() {
+                    let already_present = arr.iter().any(|v| v.as_str() == Some(name_or_path.as_str()));
+                    if !already_present {
+                        arr.push(json!(name_or_path));
+                    }
+                }
+            }
+
+            if let Some(parent) = config_path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+
+            if let Ok(pretty) = serde_json::to_string_pretty(&val) {
+                if let Err(e) = fs::write(&config_path, format!("{}\n", pretty)) {
+                    eprintln!("Failed to write {}: {}", config_path.display(), e);
+                } else {
+                    println!("Added plugin '{}' to {}", name_or_path, config_path.display());
+                }
+            }
+        }
+        PluginAction::Remove { name } => {
+            if !exists {
+                eprintln!("No active plugin.json found.");
+                return;
+            }
+
+            let mut val: Value = match fs::read_to_string(&config_path)
+                .ok()
+                .and_then(|c| serde_json::from_str(&c).ok())
+            {
+                Some(v) => v,
+                None => {
+                    eprintln!("Failed to parse {}.", config_path.display());
+                    return;
+                }
+            };
+
+            let mut removed = false;
+            if let Some(obj) = val.as_object_mut() {
+                if let Some(arr) = obj.get_mut("plugins").and_then(|p| p.as_array_mut()) {
+                    let prev_len = arr.len();
+                    arr.retain(|x| x.as_str() != Some(name.as_str()));
+                    removed = arr.len() < prev_len;
+                }
+            }
+
+            if removed {
+                if let Ok(pretty) = serde_json::to_string_pretty(&val) {
+                    let _ = fs::write(&config_path, format!("{}\n", pretty));
+                    println!("Removed plugin '{}' from {}", name, config_path.display());
+                }
+            } else {
+                eprintln!("Plugin '{}' not found in {}", name, config_path.display());
+            }
+        }
+    }
+}
+
 fn handle_init(force: bool) {
     let pwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let mcp_path = pwd.join(".mcp.json");
     let ai_dir = pwd.join(".ai");
     let settings_path = ai_dir.join("settings.json");
+    let plugin_path = ai_dir.join("plugin.json");
 
-    if !force && mcp_path.exists() && settings_path.exists() {
+    if !force && mcp_path.exists() && settings_path.exists() && plugin_path.exists() {
         println!("AI sandbox configuration already exists in {}.", pwd.display());
         println!("Use '--force' to overwrite existing configuration.");
         return;
     }
 
+    let _ = fs::create_dir_all(&ai_dir);
+
+    // 1. .mcp.json
     if force || !mcp_path.exists() {
         let default_mcp = json!({
             "mcpServers": {
@@ -253,25 +412,36 @@ fn handle_init(force: bool) {
         }
     }
 
+    // 2. .ai/settings.json
     if force || !settings_path.exists() {
-        if let Err(e) = fs::create_dir_all(&ai_dir) {
-            eprintln!("Failed to create directory {}: {}", ai_dir.display(), e);
-        } else {
-            let default_settings = json!({
-                "trustedWorkspaces": ["."],
-                "defaultHarness": "antigravity-cli",
-                "sandbox": {
-                    "allowNetwork": true,
-                    "roBinds": [],
-                    "rwBinds": []
-                }
-            });
-            if let Ok(pretty) = serde_json::to_string_pretty(&default_settings) {
-                if let Err(e) = fs::write(&settings_path, format!("{}\n", pretty)) {
-                    eprintln!("Failed to write {}: {}", settings_path.display(), e);
-                } else {
-                    println!("[OK] Created {}", settings_path.display());
-                }
+        let default_settings = json!({
+            "trustedWorkspaces": ["."],
+            "defaultHarness": "agy",
+            "sandbox": {
+                "allowNetwork": true,
+                "roBinds": [],
+                "rwBinds": []
+            }
+        });
+        if let Ok(pretty) = serde_json::to_string_pretty(&default_settings) {
+            if let Err(e) = fs::write(&settings_path, format!("{}\n", pretty)) {
+                eprintln!("Failed to write {}: {}", settings_path.display(), e);
+            } else {
+                println!("[OK] Created {}", settings_path.display());
+            }
+        }
+    }
+
+    // 3. .ai/plugin.json
+    if force || !plugin_path.exists() {
+        let default_plugins = json!({
+            "plugins": []
+        });
+        if let Ok(pretty) = serde_json::to_string_pretty(&default_plugins) {
+            if let Err(e) = fs::write(&plugin_path, format!("{}\n", pretty)) {
+                eprintln!("Failed to write {}: {}", plugin_path.display(), e);
+            } else {
+                println!("[OK] Created {}", plugin_path.display());
             }
         }
     }
@@ -360,16 +530,19 @@ fn run_harness(harness_opt: &Option<String>, args: &[String]) {
     let harness = match harness_opt {
         Some(h) => h.clone(),
         None => {
-            if pwd.join(".gemini").exists() {
-                println!("Auto-detected .gemini/ directory. Using 'antigravity-cli'.");
-                "antigravity-cli".to_string()
+            let has_agy = Path::new("/usr/sbin/agy").exists()
+                || Command::new("which").arg("agy").output().map(|o| o.status.success()).unwrap_or(false);
+
+            if pwd.join(".gemini").exists() || has_agy {
+                println!("Auto-detected Antigravity environment. Using 'agy'.");
+                "agy".to_string()
             } else if pwd.join("claude.json").exists() || pwd.join(".claude").exists() {
                 println!("Auto-detected Claude environment. Using 'claude'.");
                 "claude".to_string()
             } else {
                 println!("No harness specified and no auto-detection matched.");
                 println!("Available harnesses:");
-                println!("  1) antigravity-cli");
+                println!("  1) agy");
                 println!("  2) claude");
                 print!("Select a harness (1 or 2, or type custom name): ");
                 io::stdout().flush().unwrap();
@@ -379,7 +552,7 @@ fn run_harness(harness_opt: &Option<String>, args: &[String]) {
                 let input = input.trim();
 
                 match input {
-                    "1" => "antigravity-cli".to_string(),
+                    "1" => "agy".to_string(),
                     "2" => "claude".to_string(),
                     _ if !input.is_empty() => input.to_string(),
                     _ => {
