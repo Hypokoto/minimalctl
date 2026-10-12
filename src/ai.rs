@@ -1,26 +1,54 @@
 use clap::Subcommand;
+use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[derive(Subcommand)]
 pub enum AiCommands {
-    /// Manage Model Context Protocol (MCP) servers
+    /// Manage Model Context Protocol (MCP) servers in mcp.json
     Mcp {
         #[command(subcommand)]
-        action: EntityAction,
+        action: McpAction,
     },
     /// Manage AI Skills and Plugins
     Skill {
         #[command(subcommand)]
         action: EntityAction,
     },
+    /// Initialize AI sandbox configuration (.mcp.json and .ai/settings.json) in current directory
+    Init {
+        /// Overwrite existing configuration files
+        #[arg(short, long)]
+        force: bool,
+    },
     /// Launch an AI harness in the secure bubblewrap sandbox
     Run {
-        /// The harness executable (e.g. `coderabbit`, `antigravity-cli`, `claude`)
+        /// The harness executable (e.g. `antigravity-cli`, `claude`)
         harness: Option<String>,
         /// Arguments passed to the harness
         args: Vec<String>,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum McpAction {
+    /// List configured MCP servers from mcp.json
+    List,
+    /// Connect or register a new MCP server in mcp.json
+    Connect {
+        /// Identifier/name for the server
+        name: String,
+        /// Command to execute (e.g. npx, node, uvx, python)
+        command: Option<String>,
+        /// Arguments for the command
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Remove an MCP server from mcp.json by name
+    Remove {
+        /// Name of the MCP server to remove
+        name: String,
     },
 }
 
@@ -39,9 +67,9 @@ pub enum EntityAction {
 fn get_sandbox_dir() -> PathBuf {
     let home = std::env::var("HOME").expect("HOME not set");
     let dir = PathBuf::from(home).join(".local/share/ai-sandbox");
-    fs::create_dir_all(dir.join("mcps")).unwrap();
-    fs::create_dir_all(dir.join("skills")).unwrap();
-    fs::create_dir_all(dir.join("plugins")).unwrap();
+    let _ = fs::create_dir_all(dir.join("mcps"));
+    let _ = fs::create_dir_all(dir.join("skills"));
+    let _ = fs::create_dir_all(dir.join("plugins"));
     dir
 }
 
@@ -49,10 +77,206 @@ pub fn handle_ai(cmd: &AiCommands) {
     let sandbox_dir = get_sandbox_dir();
 
     match cmd {
-        AiCommands::Mcp { action } => handle_entity(&sandbox_dir.join("mcps"), action, "MCP"),
+        AiCommands::Mcp { action } => handle_mcp(action),
         AiCommands::Skill { action } => handle_entity(&sandbox_dir.join("skills"), action, "Skill"),
+        AiCommands::Init { force } => handle_init(*force),
         AiCommands::Run { harness, args } => run_harness(harness, args),
     }
+}
+
+fn find_mcp_config() -> (PathBuf, bool) {
+    let pwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let global_config = PathBuf::from(&home).join(".config/ai-sandbox/mcp.json");
+
+    let candidates = [
+        pwd.join(".mcp.json"),
+        pwd.join("mcp.json"),
+        global_config,
+    ];
+
+    for path in &candidates {
+        if path.exists() {
+            return (path.clone(), true);
+        }
+    }
+
+    (pwd.join(".mcp.json"), false)
+}
+
+fn handle_mcp(action: &McpAction) {
+    let (config_path, exists) = find_mcp_config();
+
+    match action {
+        McpAction::List => {
+            if !exists {
+                println!("No active mcp.json found.");
+                println!("Run 'minimalctl ai init' to scaffold a project configuration,");
+                println!("or add a server with 'minimalctl ai mcp connect <name> [cmd] [args...]'.");
+                return;
+            }
+
+            println!("Active MCP Config: {}", config_path.display());
+            match fs::read_to_string(&config_path) {
+                Ok(content) => match serde_json::from_str::<Value>(&content) {
+                    Ok(val) => {
+                        if let Some(servers) = val.get("mcpServers").and_then(|s| s.as_object()) {
+                            if servers.is_empty() {
+                                println!("  (No servers defined in mcpServers)");
+                            } else {
+                                for (name, def) in servers {
+                                    let cmd = def.get("command").and_then(|c| c.as_str()).unwrap_or("<unknown>");
+                                    let args_str = def.get("args")
+                                        .and_then(|a| a.as_array())
+                                        .map(|arr| {
+                                            arr.iter()
+                                                .filter_map(|x| x.as_str())
+                                                .collect::<Vec<_>>()
+                                                .join(" ")
+                                        })
+                                        .unwrap_or_default();
+                                    println!("  - [{}] {} {}", name, cmd, args_str);
+                                }
+                            }
+                        } else {
+                            println!("  No valid 'mcpServers' object found in config.");
+                        }
+                    }
+                    Err(e) => eprintln!("Failed to parse JSON in {}: {}", config_path.display(), e),
+                },
+                Err(e) => eprintln!("Failed to read {}: {}", config_path.display(), e),
+            }
+        }
+        McpAction::Connect { name, command, args } => {
+            let mut val: Value = if exists {
+                fs::read_to_string(&config_path)
+                    .ok()
+                    .and_then(|c| serde_json::from_str(&c).ok())
+                    .unwrap_or_else(|| json!({ "mcpServers": {} }))
+            } else {
+                json!({ "mcpServers": {} })
+            };
+
+            let (cmd_str, final_args) = match command {
+                Some(c) => (c.clone(), args.clone()),
+                None => (
+                    "npx".to_string(),
+                    vec!["-y".to_string(), format!("@modelcontextprotocol/server-{}", name)],
+                ),
+            };
+
+            let server_obj = json!({
+                "command": cmd_str,
+                "args": final_args
+            });
+
+            if let Some(obj) = val.as_object_mut() {
+                let servers = obj.entry("mcpServers").or_insert_with(|| json!({}));
+                if let Some(s_map) = servers.as_object_mut() {
+                    s_map.insert(name.clone(), server_obj);
+                }
+            }
+
+            if let Ok(pretty) = serde_json::to_string_pretty(&val) {
+                if let Err(e) = fs::write(&config_path, format!("{}\n", pretty)) {
+                    eprintln!("Failed to write {}: {}", config_path.display(), e);
+                } else {
+                    println!("Registered MCP server '{}' in {}", name, config_path.display());
+                }
+            }
+        }
+        McpAction::Remove { name } => {
+            if !exists {
+                eprintln!("No active mcp.json found.");
+                return;
+            }
+
+            let mut val: Value = match fs::read_to_string(&config_path)
+                .ok()
+                .and_then(|c| serde_json::from_str(&c).ok())
+            {
+                Some(v) => v,
+                None => {
+                    eprintln!("Failed to parse {}.", config_path.display());
+                    return;
+                }
+            };
+
+            let mut removed = false;
+            if let Some(obj) = val.as_object_mut() {
+                if let Some(servers) = obj.get_mut("mcpServers").and_then(|s| s.as_object_mut()) {
+                    if servers.remove(name).is_some() {
+                        removed = true;
+                    }
+                }
+            }
+
+            if removed {
+                if let Ok(pretty) = serde_json::to_string_pretty(&val) {
+                    let _ = fs::write(&config_path, format!("{}\n", pretty));
+                    println!("Removed MCP server '{}' from {}", name, config_path.display());
+                }
+            } else {
+                eprintln!("Server '{}' not found in {}", name, config_path.display());
+            }
+        }
+    }
+}
+
+fn handle_init(force: bool) {
+    let pwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let mcp_path = pwd.join(".mcp.json");
+    let ai_dir = pwd.join(".ai");
+    let settings_path = ai_dir.join("settings.json");
+
+    if !force && mcp_path.exists() && settings_path.exists() {
+        println!("AI sandbox configuration already exists in {}.", pwd.display());
+        println!("Use '--force' to overwrite existing configuration.");
+        return;
+    }
+
+    if force || !mcp_path.exists() {
+        let default_mcp = json!({
+            "mcpServers": {
+                "filesystem": {
+                    "command": "npx",
+                    "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+                }
+            }
+        });
+        if let Ok(pretty) = serde_json::to_string_pretty(&default_mcp) {
+            if let Err(e) = fs::write(&mcp_path, format!("{}\n", pretty)) {
+                eprintln!("Failed to write {}: {}", mcp_path.display(), e);
+            } else {
+                println!("[OK] Created {}", mcp_path.display());
+            }
+        }
+    }
+
+    if force || !settings_path.exists() {
+        if let Err(e) = fs::create_dir_all(&ai_dir) {
+            eprintln!("Failed to create directory {}: {}", ai_dir.display(), e);
+        } else {
+            let default_settings = json!({
+                "trustedWorkspaces": ["."],
+                "defaultHarness": "antigravity-cli",
+                "sandbox": {
+                    "allowNetwork": true,
+                    "roBinds": [],
+                    "rwBinds": []
+                }
+            });
+            if let Ok(pretty) = serde_json::to_string_pretty(&default_settings) {
+                if let Err(e) = fs::write(&settings_path, format!("{}\n", pretty)) {
+                    eprintln!("Failed to write {}: {}", settings_path.display(), e);
+                } else {
+                    println!("[OK] Created {}", settings_path.display());
+                }
+            }
+        }
+    }
+
+    println!("\nProject AI sandbox initialized. Launch with: minimalctl ai run");
 }
 
 fn handle_entity(dir: &Path, action: &EntityAction, kind: &str) {
@@ -66,7 +290,6 @@ fn handle_entity(dir: &Path, action: &EntityAction, kind: &str) {
             }
         }
         EntityAction::Connect { source } => {
-            // Simplified logic: symlink or clone the source into the registry
             println!("Connecting {} from '{}'...", kind, source);
             let name = match Path::new(source).file_name() {
                 Some(n) => n,
@@ -78,14 +301,12 @@ fn handle_entity(dir: &Path, action: &EntityAction, kind: &str) {
             let dest = dir.join(name);
 
             if Path::new(source).exists() {
-                // local path, create symlink
                 if let Err(e) = std::os::unix::fs::symlink(source, &dest) {
                     eprintln!("Failed to link {}: {}", source, e);
                 } else {
                     println!("Linked {} to {}", source, dest.display());
                 }
             } else if source.starts_with("http") || source.starts_with("git@") {
-                // git clone
                 let status = Command::new("git")
                     .arg("clone")
                     .arg(source)
@@ -142,8 +363,8 @@ fn run_harness(harness_opt: &Option<String>, args: &[String]) {
             if pwd.join(".gemini").exists() {
                 println!("Auto-detected .gemini/ directory. Using 'antigravity-cli'.");
                 "antigravity-cli".to_string()
-            } else if pwd.join("claude.json").exists() {
-                println!("Auto-detected claude.json. Using 'claude'.");
+            } else if pwd.join("claude.json").exists() || pwd.join(".claude").exists() {
+                println!("Auto-detected Claude environment. Using 'claude'.");
                 "claude".to_string()
             } else {
                 println!("No harness specified and no auto-detection matched.");
@@ -170,10 +391,18 @@ fn run_harness(harness_opt: &Option<String>, args: &[String]) {
         }
     };
 
-    let mut ai_script = Command::new(format!("{}/minimal/scripts/ai", home));
+    let ai_script_path = if Path::new(&home).join(".local/bin/ai").exists() {
+        PathBuf::from(&home).join(".local/bin/ai")
+    } else if pwd.join("scripts/ai").exists() {
+        pwd.join("scripts/ai")
+    } else {
+        PathBuf::from(format!("{}/minimal/scripts/ai", home))
+    };
+
+    let mut ai_script = Command::new(&ai_script_path);
     ai_script.arg(&harness).args(args);
 
     let err = ai_script.exec();
-    eprintln!("Failed to exec scripts/ai: {}", err);
+    eprintln!("Failed to exec {}: {}", ai_script_path.display(), err);
     std::process::exit(1);
 }
