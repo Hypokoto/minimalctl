@@ -184,4 +184,12 @@ if [[ "$DO_APPARMOR" -eq 1 ]]; then
     fi
 fi
 
+# 5. ZRAM Memory Generator Deployment
+if [[ -f "$DIR/zram-generator.conf" ]]; then
+    echo "[*] Deploying ZRAM generator configuration..."
+    sudo install -m 644 -o root -g root "$DIR/zram-generator.conf" /etc/systemd/
+    sudo systemctl daemon-reload
+    sudo systemctl restart "systemd-zram-setup@zram0.service" || echo "[-] Note: ZRAM service will apply on next restart or swap re-init."
+fi
+
 echo "=== Hardening Complete ==="
