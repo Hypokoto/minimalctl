@@ -33,17 +33,101 @@ done
 usage() {
     local exit_code="${1:-0}"
     cat <<'EOF'
-Usage: ai <harness> [args...]
+Usage: ai [command] [args...]
+   or: ai <harness> [args...]
 
-Arguments:
-  harness       The AI harness to launch (e.g., agy, antigravity-cli, claude)
-  args          Arguments passed directly to the harness
+Commands:
+  init [--force]        Initialize AI sandbox config (.mcp.json, .ai/) in current workspace
+  run <harness> [args]  Launch AI harness inside the Bubblewrap sandbox
+  mcp [action]          Manage Model Context Protocol servers
+  plugin [action]       Manage AI plugins
+  skill [action]        Manage AI skills
+
+Direct Harness Launch:
+  ai agy [args...]
+  ai claude [args...]
+  ai antigravity-cli [args...]
 
 Configurations:
   Project:      ./.mcp.json, ./.ai/settings.json, ./.ai/plugin.json
   Global:       ~/.config/ai-sandbox/{mcp,settings,plugin}.json
 EOF
     exit "$exit_code"
+}
+
+handle_init() {
+    local force=false
+    for arg in "$@"; do
+        if [[ "$arg" == "--force" || "$arg" == "-f" ]]; then
+            force=true
+        fi
+    done
+
+    local pwd_dir
+    pwd_dir="$(pwd -P)"
+    local mcp_path="$pwd_dir/.mcp.json"
+    local ai_dir="$pwd_dir/.ai"
+    local settings_path="$ai_dir/settings.json"
+    local plugin_path="$ai_dir/plugin.json"
+
+    if [[ "$force" == false && -f "$mcp_path" && -f "$settings_path" && -f "$plugin_path" ]]; then
+        echo "AI sandbox configuration already exists in $pwd_dir."
+        echo "Use '--force' to overwrite existing configuration."
+        exit 0
+    fi
+
+    mkdir -p "$ai_dir"
+
+    # 1. .mcp.json
+    if [[ "$force" == true || ! -f "$mcp_path" ]]; then
+        cat > "$mcp_path" << 'EOF'
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "."
+      ]
+    }
+  }
+}
+EOF
+        echo "[OK] Created $mcp_path"
+    fi
+
+    # 2. .ai/settings.json
+    if [[ "$force" == true || ! -f "$settings_path" ]]; then
+        cat > "$settings_path" << 'EOF'
+{
+  "defaultHarness": "agy",
+  "sandbox": {
+    "allowNetwork": true,
+    "roBinds": [],
+    "rwBinds": []
+  },
+  "trustedWorkspaces": [
+    "."
+  ]
+}
+EOF
+        echo "[OK] Created $settings_path"
+    fi
+
+    # 3. .ai/plugin.json
+    if [[ "$force" == true || ! -f "$plugin_path" ]]; then
+        cat > "$plugin_path" << 'EOF'
+{
+  "plugins": []
+}
+EOF
+        echo "[OK] Created $plugin_path"
+    fi
+
+    echo ""
+    echo "Project AI sandbox initialized. Launch with: ai <harness> (e.g. ai agy)"
+    exit 0
 }
 
 if [[ $# -lt 1 ]]; then
@@ -53,6 +137,43 @@ fi
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     usage 0
 fi
+
+# Subcommand dispatch
+case "${1:-}" in
+    init)
+        shift
+        if command -v minimalctl >/dev/null 2>&1; then
+            exec minimalctl ai init "$@"
+        elif [[ -x "$HOME/.local/bin/minimalctl" ]]; then
+            exec "$HOME/.local/bin/minimalctl" ai init "$@"
+        elif [[ -x "$HOME/minimal/target/release/minimalctl" ]]; then
+            exec "$HOME/minimal/target/release/minimalctl" ai init "$@"
+        else
+            handle_init "$@"
+        fi
+        ;;
+    run)
+        shift
+        if [[ $# -lt 1 ]]; then
+            echo "Error: 'ai run' requires a harness executable (e.g., ai run agy, ai run claude)" >&2
+            exit 1
+        fi
+        ;;
+    mcp|plugin|skill)
+        sub="$1"
+        shift
+        if command -v minimalctl >/dev/null 2>&1; then
+            exec minimalctl ai "$sub" "$@"
+        elif [[ -x "$HOME/.local/bin/minimalctl" ]]; then
+            exec "$HOME/.local/bin/minimalctl" ai "$sub" "$@"
+        elif [[ -x "$HOME/minimal/target/release/minimalctl" ]]; then
+            exec "$HOME/minimal/target/release/minimalctl" ai "$sub" "$@"
+        else
+            echo "Error: 'minimalctl' is required for 'ai $sub'." >&2
+            exit 1
+        fi
+        ;;
+esac
 
 HARNESS="$1"
 shift
