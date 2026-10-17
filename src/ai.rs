@@ -4,6 +4,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+pub mod wasm;
+
 #[derive(Subcommand)]
 pub enum AiCommands {
     /// Manage Model Context Protocol (MCP) servers in mcp.json
@@ -33,6 +35,11 @@ pub enum AiCommands {
         harness: Option<String>,
         /// Arguments passed to the harness
         args: Vec<String>,
+    },
+    /// Manage and execute isolated WebAssembly tools
+    Wasm {
+        #[command(subcommand)]
+        action: wasm::WasmAction,
     },
 }
 
@@ -103,6 +110,7 @@ pub fn handle_ai(cmd: &AiCommands) {
         AiCommands::Skill { action } => handle_entity(&sandbox_dir.join("skills"), action, "Skill"),
         AiCommands::Init { force } => handle_init(*force),
         AiCommands::Run { harness, args } => run_harness(harness, args),
+        AiCommands::Wasm { action } => wasm::handle_wasm(action),
     }
 }
 

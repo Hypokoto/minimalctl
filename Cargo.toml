@@ -5,6 +5,10 @@ edition = "2021"
 authors = ["Hypokoto <hypokoto@minimal>"]
 description = "Native control plane and theme compiler for Minimal OS Shell"
 
+[features]
+default = []
+wasm = ["dep:wasmtime"]
+
 [dependencies]
 libc = "0.2"
 clap = { version = "4.4", features = ["derive"] }
@@ -15,6 +19,7 @@ rkyv = { version = "0.7", features = ["validation", "strict"] }
 memmap2 = "0.9"
 bytecheck = "0.6"
 termimad = "0.35.5"
+wasmtime = { version = "49.0.3", default-features = false, features = ["cranelift", "runtime", "std", "wat"], optional = true }
 
 [[bin]]
 name = "minimalctl"
@@ -22,3 +27,6 @@ path = "src/main.rs"
 
 [build-dependencies]
 cc = "1.0"
+
+[dev-dependencies]
+wat = "1.262.0"
